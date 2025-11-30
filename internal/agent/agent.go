@@ -3,6 +3,7 @@ package agent
 
 import (
 	"zlnew/monitor-agent/internal/collector/cpu"
+	"zlnew/monitor-agent/internal/collector/memory"
 	"zlnew/monitor-agent/internal/core"
 	"zlnew/monitor-agent/internal/infra/config"
 	"zlnew/monitor-agent/internal/infra/logger"
@@ -19,8 +20,10 @@ type Agent struct {
 func New(log logger.Logger, cfg *config.Config) *Agent {
 	reg := core.NewRegistry()
 	cpuCollector := cpu.NewCollector()
+	memoryCollector := memory.NewCollector()
 
 	reg.Register("cpu", cpuCollector)
+	reg.Register("memory", memoryCollector)
 
 	httpServer := http.NewServer(cfg, reg, log)
 

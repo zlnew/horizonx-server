@@ -10,13 +10,8 @@ import (
 	"zlnew/monitor-agent/pkg"
 )
 
-var (
-	raplLastEnergy     uint64
-	raplLastEnergyTime time.Time
-)
-
-func readWatt() (float64, error) {
-	if watt, err := readRAPL(); err == nil && watt > 0 {
+func (c *Collector) readWatt() (float64, error) {
+	if watt, err := c.readRAPL(); err == nil && watt > 0 {
 		return watt, nil
 	}
 	if watt, err := readHwmon(); err == nil && watt > 0 {
@@ -28,7 +23,7 @@ func readWatt() (float64, error) {
 	return 0, nil
 }
 
-func readRAPL() (float64, error) {
+func (c *Collector) readRAPL() (float64, error) {
 	b, err := os.ReadFile("/sys/class/powercap/intel-rapl/intel-rapl:0/energy_uj")
 	if err != nil {
 		return 0, err
@@ -37,17 +32,17 @@ func readRAPL() (float64, error) {
 	energy, _ := strconv.ParseUint(strings.TrimSpace(string(b)), 10, 64)
 
 	now := time.Now()
-	if raplLastEnergy == 0 {
-		raplLastEnergy = energy
-		raplLastEnergyTime = now
+	if c.lastEnergy == 0 {
+		c.lastEnergy = energy
+		c.lastTime = now
 		return 0, nil
 	}
 
-	deltaEnergy := float64(energy - raplLastEnergy)
-	deltaTime := now.Sub(raplLastEnergyTime).Seconds()
+	deltaEnergy := float64(energy - c.lastEnergy)
+	deltaTime := now.Sub(c.lastTime).Seconds()
 
-	raplLastEnergy = energy
-	raplLastEnergyTime = now
+	c.lastEnergy = energy
+	c.lastTime = now
 
 	watt := (deltaEnergy / 1e6) / deltaTime
 

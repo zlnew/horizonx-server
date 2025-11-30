@@ -6,7 +6,7 @@ import (
 )
 
 type Collector interface {
-	Collect(ctx context.Context) (CPUMetric, error)
+	Collect(ctx context.Context) (any, error)
 }
 
 type Registry struct {
@@ -32,6 +32,8 @@ func (r *Registry) Update(name string, value any) {
 	switch name {
 	case "cpu":
 		r.snapshot.CPU = value.(CPUMetric)
+	case "memory":
+		r.snapshot.Memory = value.(MemoryMetric)
 	}
 	r.mu.Unlock()
 }

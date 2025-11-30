@@ -9,9 +9,9 @@ func NewCollector() *Collector {
 	return &Collector{}
 }
 
-func (c *Collector) Collect(ctx context.Context) (CPUMetric, error) {
+func (c *Collector) Collect(ctx context.Context) (any, error) {
 	usage, perCore, _ := readUsage()
-	watt, _ := readWatt()
+	watt, _ := c.readWatt()
 	temp, _ := readTemp()
 	freq, _ := readFreq()
 

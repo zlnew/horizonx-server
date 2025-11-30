@@ -1,10 +1,13 @@
 package cpu
 
-import "zlnew/monitor-agent/internal/core"
+import (
+	"time"
+	"zlnew/monitor-agent/internal/core"
+)
 
 type Collector struct {
 	lastEnergy uint64
-	lastTime   int64
+	lastTime   time.Time
 }
 
 type CPUMetric = core.CPUMetric
