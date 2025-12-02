@@ -6,7 +6,7 @@ import (
 	"strings"
 )
 
-func readSpecs() ([]MemorySpec, error) {
+func getSpecs() ([]MemorySpec, error) {
 	cmd := exec.Command("dmidecode", "-t", "memory")
 	out, err := cmd.Output()
 	if err != nil {

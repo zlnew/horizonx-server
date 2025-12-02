@@ -38,6 +38,8 @@ func (r *Registry) Update(name string, value any) {
 		r.snapshot.Memory = value.(MemoryMetric)
 	case "disk":
 		r.snapshot.Disk = value.(DiskMetric)
+	case "system":
+		r.snapshot.System = value.(SystemMetric)
 	}
 	r.mu.Unlock()
 }

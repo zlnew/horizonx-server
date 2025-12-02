@@ -5,7 +5,7 @@ import (
 	"strings"
 )
 
-func readSpec() (GPUSpec, error) {
+func getSpec() (GPUSpec, error) {
 	out, err := exec.Command("lspci").Output()
 	if err != nil {
 		return GPUSpec{}, err

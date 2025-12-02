@@ -10,20 +10,20 @@ import (
 	"zlnew/monitor-agent/pkg"
 )
 
-func (c *Collector) readWatt() (float64, error) {
-	if watt, err := c.readRAPL(); err == nil && watt > 0 {
+func (c *Collector) getWatt() (float64, error) {
+	if watt, err := c.getRAPL(); err == nil && watt > 0 {
 		return watt, nil
 	}
-	if watt, err := readHwmon(); err == nil && watt > 0 {
+	if watt, err := getHwmon(); err == nil && watt > 0 {
 		return watt, nil
 	}
-	if watt, err := readRyzenSMU(); err == nil && watt > 0 {
+	if watt, err := getRyzenSMU(); err == nil && watt > 0 {
 		return watt, nil
 	}
 	return 0, nil
 }
 
-func (c *Collector) readRAPL() (float64, error) {
+func (c *Collector) getRAPL() (float64, error) {
 	b, err := os.ReadFile("/sys/class/powercap/intel-rapl/intel-rapl:0/energy_uj")
 	if err != nil {
 		return 0, err
@@ -49,7 +49,7 @@ func (c *Collector) readRAPL() (float64, error) {
 	return watt, nil
 }
 
-func readHwmon() (float64, error) {
+func getHwmon() (float64, error) {
 	matches, _ := filepath.Glob("/sys/class/hwmon/hwmon*/power*_input")
 	targets := []string{
 		"zenpower",
@@ -85,6 +85,6 @@ func readHwmon() (float64, error) {
 	return 0, nil
 }
 
-func readRyzenSMU() (float64, error) {
+func getRyzenSMU() (float64, error) {
 	return 0, nil
 }

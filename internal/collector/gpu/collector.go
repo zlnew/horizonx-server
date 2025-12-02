@@ -8,12 +8,12 @@ func NewCollector() *Collector {
 }
 
 func (c *Collector) Collect(ctx context.Context) (any, error) {
-	usage := readUsage()
-	temp, _ := readTemp()
-	vramTotal := readVramTotal()
-	vramUsed := readVramUsed()
-	watt, _ := readPower()
-	spec, _ := readSpec()
+	usage := getUsage()
+	temp, _ := getTemp()
+	vramTotal := getVramTotal()
+	vramUsed := getVramUsed()
+	watt, _ := getPower()
+	spec, _ := getSpec()
 
 	return GPUMetric{
 		Spec:      spec,

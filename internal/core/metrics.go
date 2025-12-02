@@ -69,7 +69,7 @@ type SystemMetric struct {
 	Hostname string `json:"hostname"`
 	OS       string `json:"os"`
 	Kernel   string `json:"kernel"`
-	Uptime   string `json:"uptime"`
+	Uptime   uint64 `json:"uptime"`
 }
 
 type Metrics struct {

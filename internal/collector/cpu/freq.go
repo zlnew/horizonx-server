@@ -6,7 +6,7 @@ import (
 	"strings"
 )
 
-func readFreq() (float64, error) {
+func getFreq() (float64, error) {
 	b, err := os.ReadFile("/sys/devices/system/cpu/cpu0/cpufreq/scaling_cur_freq")
 	if err != nil {
 		return 0, err

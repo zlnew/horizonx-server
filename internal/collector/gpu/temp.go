@@ -9,7 +9,7 @@ import (
 	"zlnew/monitor-agent/pkg"
 )
 
-func readTemp() (float64, error) {
+func getTemp() (float64, error) {
 	matches, _ := filepath.Glob("/sys/class/hwmon/hwmon*/temp*_input")
 	targets := []string{
 		"nvidia",

@@ -9,7 +9,7 @@ import (
 	"zlnew/monitor-agent/pkg"
 )
 
-func readPower() (float64, error) {
+func getPower() (float64, error) {
 	matches, _ := filepath.Glob("/sys/class/hwmon/hwmon*/power*_input")
 	targets := []string{
 		"nvidia",

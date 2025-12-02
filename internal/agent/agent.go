@@ -6,6 +6,7 @@ import (
 	"zlnew/monitor-agent/internal/collector/disk"
 	"zlnew/monitor-agent/internal/collector/gpu"
 	"zlnew/monitor-agent/internal/collector/memory"
+	"zlnew/monitor-agent/internal/collector/system"
 	"zlnew/monitor-agent/internal/core"
 	"zlnew/monitor-agent/internal/infra/config"
 	"zlnew/monitor-agent/internal/infra/logger"
@@ -25,11 +26,13 @@ func New(log logger.Logger, cfg *config.Config) *Agent {
 	gpuCollector := gpu.NewCollector()
 	memoryCollector := memory.NewCollector()
 	diskCollector := disk.NewCollector()
+	systemCollector := system.NewCollector()
 
 	reg.Register("cpu", cpuCollector)
 	reg.Register("gpu", gpuCollector)
 	reg.Register("memory", memoryCollector)
 	reg.Register("disk", diskCollector)
+	reg.Register("system", systemCollector)
 
 	httpServer := http.NewServer(cfg, reg, log)
 

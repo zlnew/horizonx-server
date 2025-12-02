@@ -7,7 +7,7 @@ import (
 	"strings"
 )
 
-func readUsage() float64 {
+func getUsage() float64 {
 	matches, _ := filepath.Glob("/sys/class/drm/card*/device/gpu_busy_percent")
 
 	for _, p := range matches {

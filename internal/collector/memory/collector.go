@@ -19,7 +19,7 @@ func (c *Collector) Collect(ctx context.Context) (any, error) {
 	swapTotal := c.getSwapTotal()
 	swapFree := c.getSwapFree()
 	swapUsed := c.getSwapUsed()
-	specs, _ := readSpecs()
+	specs, _ := getSpecs()
 
 	return MemoryMetric{
 		MemTotal:     memTotal,

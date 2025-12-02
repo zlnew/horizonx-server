@@ -6,7 +6,7 @@ import (
 	"strings"
 )
 
-func readUsage() (float64, []float64, error) {
+func getUsage() (float64, []float64, error) {
 	data, err := os.ReadFile("/proc/stat")
 	if err != nil {
 		return 0, nil, err

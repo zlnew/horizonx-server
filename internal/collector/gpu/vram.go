@@ -7,7 +7,7 @@ import (
 	"strings"
 )
 
-func readVramTotal() float64 {
+func getVramTotal() float64 {
 	matches, _ := filepath.Glob("/sys/class/drm/card*/device/mem_info_vram_total")
 
 	for _, p := range matches {
@@ -25,7 +25,7 @@ func readVramTotal() float64 {
 	return 0
 }
 
-func readVramUsed() float64 {
+func getVramUsed() float64 {
 	matches, _ := filepath.Glob("/sys/class/drm/card*/device/mem_info_vram_used")
 
 	for _, p := range matches {

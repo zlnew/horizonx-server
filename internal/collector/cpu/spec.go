@@ -8,7 +8,7 @@ import (
 	"strings"
 )
 
-func readSpec() (CPUSpec, error) {
+func getSpec() (CPUSpec, error) {
 	var spec CPUSpec
 
 	file, err := os.Open("/proc/cpuinfo")
