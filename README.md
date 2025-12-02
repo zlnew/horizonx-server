@@ -25,11 +25,11 @@ Lightweight Go daemon that scrapes local CPU, GPU, memory, disk, and system stat
 - Each collector degrades gracefully—missing or unreadable inputs yield zeros rather than crashing the agent.
 - Collected fields:
   - CPU: usage and per-core %, frequency (MHz), power (W) from RAPL/hwmon, temp (C), and spec from `/proc/cpuinfo`/cpufreq.
-  - GPU: busy percent from `/sys/class/drm`, VRAM total/used (MB), temp/power from hwmon, and spec via `lspci`.
-  - Memory: totals/available/used (GB), swap (GB), and DIMM specs from `dmidecode`.
-  - Disk: total/free/used (GB) from the root filesystem and NVMe temp (C) when available.
+  - GPU: busy percent from `/sys/class/drm`, VRAM total/used (MiB), temp/power from hwmon, and spec via `lspci`.
+  - Memory: totals/available/used (GiB, binary), swap (GiB, binary), and DIMM specs from `dmidecode`.
+  - Disk: total/free/used (GB, decimal) from the root filesystem and NVMe temp (C) when available.
+  - Network: upload/download rates (Mbps, aggregated bits/s) from `/proc/net/dev` for non-loopback interfaces.
   - System: hostname, OS pretty name, kernel version, uptime seconds.
-  - Network: placeholder struct present in the payload but not yet populated.
 
 ### Endpoint
 
@@ -88,8 +88,8 @@ Lightweight Go daemon that scrapes local CPU, GPU, memory, disk, and system stat
       "temp": 41.5
     },
     "network": {
-      "upload": 0,
-      "download": 0
+      "upload": 1.2,
+      "download": 8.5
     },
     "system": {
       "hostname": "monitor-host",
@@ -103,9 +103,9 @@ Lightweight Go daemon that scrapes local CPU, GPU, memory, disk, and system stat
 ## Project layout
 
 - `cmd/agent`: Entrypoint wiring config/logger and starting the agent.
-- `internal/agent`: Builds the registry, registers CPU/GPU/memory/disk/system collectors, and starts HTTP.
+- `internal/agent`: Builds the registry, registers CPU/GPU/memory/disk/network/system collectors, and starts HTTP.
 - `internal/core`: Metric types, registry, and 1s scheduler that refreshes snapshots.
-- `internal/collector/*`: Source-specific collectors for CPU, GPU, memory, disk, and system metadata.
+- `internal/collector/*`: Source-specific collectors for CPU, GPU, memory, disk, network throughput, and system metadata.
 - `internal/transport/http`: Exposes `/metrics`.
 - `internal/infra`: Config loader (`HTTP_ADDR`, `.env`) and logger interface/implementation.
 - `pkg`: Small shared helpers.

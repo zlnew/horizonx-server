@@ -17,9 +17,6 @@ func (c *Collector) getWatt() (float64, error) {
 	if watt, err := getHwmon(); err == nil && watt > 0 {
 		return watt, nil
 	}
-	if watt, err := getRyzenSMU(); err == nil && watt > 0 {
-		return watt, nil
-	}
 	return 0, nil
 }
 
@@ -82,9 +79,5 @@ func getHwmon() (float64, error) {
 		}
 	}
 
-	return 0, nil
-}
-
-func getRyzenSMU() (float64, error) {
 	return 0, nil
 }
