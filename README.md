@@ -30,6 +30,7 @@ Lightweight Go daemon that scrapes local CPU, GPU, memory, disk, and system stat
   - Disk: total/free/used (GB, decimal) from the root filesystem and NVMe temp (C) when available.
   - Network: upload/download rates (Mbps, aggregated bits/s) from `/proc/net/dev` for non-loopback interfaces.
   - System: hostname, OS pretty name, kernel version, uptime seconds.
+  - Metadata: per-field units so consumers don’t have to guess (percent, MHz, MiB/GiB, GB, Mbps, seconds, etc.).
 
 ### Endpoint
 
@@ -96,6 +97,43 @@ Lightweight Go daemon that scrapes local CPU, GPU, memory, disk, and system stat
       "os": "Ubuntu 22.04.4 LTS",
       "kernel": "6.5.0-45-generic",
       "uptime": 12345
+    },
+    "metadata": {
+      "cpu": {
+        "usage": "percent",
+        "per_core": "percent",
+        "watt": "watt",
+        "temp": "celsius",
+        "frequency": "MHz"
+      },
+      "gpu": {
+        "usage": "percent",
+        "vram_total": "MiB",
+        "vram_used": "MiB",
+        "temp": "celsius",
+        "watt": "watt"
+      },
+      "memory": {
+        "mem_total": "GiB",
+        "mem_available": "GiB",
+        "mem_used": "GiB",
+        "swap_total": "GiB",
+        "swap_free": "GiB",
+        "swap_used": "GiB"
+      },
+      "disk": {
+        "total": "GB",
+        "free": "GB",
+        "used": "GB",
+        "temp": "celsius"
+      },
+      "network": {
+        "upload": "Mbps",
+        "download": "Mbps"
+      },
+      "system": {
+        "uptime": "seconds"
+      }
     }
   }
   ```

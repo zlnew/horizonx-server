@@ -73,10 +73,11 @@ type SystemMetric struct {
 }
 
 type Metrics struct {
-	CPU     CPUMetric     `json:"cpu"`
-	GPU     GPUMetric     `json:"gpu"`
-	Memory  MemoryMetric  `json:"memory"`
-	Disk    DiskMetric    `json:"disk"`
-	Network NetworkMetric `json:"network"`
-	System  SystemMetric  `json:"system"`
+	CPU      CPUMetric     `json:"cpu"`
+	GPU      GPUMetric     `json:"gpu"`
+	Memory   MemoryMetric  `json:"memory"`
+	Disk     DiskMetric    `json:"disk"`
+	Network  NetworkMetric `json:"network"`
+	System   SystemMetric  `json:"system"`
+	Metadata Metadata      `json:"metadata"`
 }

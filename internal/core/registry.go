@@ -18,6 +18,9 @@ type Registry struct {
 func NewRegistry() *Registry {
 	return &Registry{
 		collectors: make(map[string]Collector),
+		snapshot: Metrics{
+			Metadata: DefaultMetadata(),
+		},
 	}
 }
 
