@@ -8,17 +8,33 @@ func NewCollector() *Collector {
 }
 
 func (c *Collector) Collect(ctx context.Context) (any, error) {
-	usage := getUsage()
-	temperature := getTemperature()
-	vramTotalGB := getVramTotalGB()
-	vramUsedGB := getVramUsedGB()
-	powerWatt := getPowerWatt()
+	cards := detectGPUs()
+	var out []GPUMetric
 
-	return []GPUMetric{{
-		Usage:       usage,
-		Temperature: temperature,
-		VramTotalGB: vramTotalGB,
-		VramUsedGB:  vramUsedGB,
-		PowerWatt:   powerWatt,
-	}}, nil
+	for i, card := range cards {
+		vendor := readVendor(card)
+		model := readModel(card)
+
+		temp := readTemperature(card)
+		usage := readCoreUsage(card)
+		vramTotal, vramUsed, vramPercent := readVRAM(card)
+		power := readPower(card)
+		fanSpeed := readFanSpeedPercent(card)
+
+		out = append(out, GPUMetric{
+			ID:               i,
+			Card:             card,
+			Vendor:           vendor,
+			Model:            model,
+			Temperature:      temp,
+			CoreUsagePercent: usage,
+			VRAMTotalGB:      vramTotal,
+			VRAMUsedGB:       vramUsed,
+			VRAMPercent:      vramPercent,
+			PowerWatt:        power,
+			FanSpeedPercent:  fanSpeed,
+		})
+	}
+
+	return out, nil
 }

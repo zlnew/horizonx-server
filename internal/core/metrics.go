@@ -11,13 +11,14 @@ type CPUMetric struct {
 
 type GPUMetric struct {
 	ID               int     `json:"id"`
+	Card             string  `json:"card"`
 	Vendor           string  `json:"vendor"`
 	Model            string  `json:"model"`
 	Temperature      float64 `json:"temperature"`
-	Usage            float64 `json:"usage"`
-	VramTotalGB      float64 `json:"vram_total_gb"`
-	VramUsedGB       float64 `json:"vram_used_gb"`
-	VramUsagePercent float64 `json:"vram_usage_percent"`
+	CoreUsagePercent float64 `json:"core_usage_percent"`
+	VRAMTotalGB      float64 `json:"vram_total_gb"`
+	VRAMUsedGB       float64 `json:"vram_used_gb"`
+	VRAMPercent      float64 `json:"vram_percent"`
 	PowerWatt        float64 `json:"power_watt"`
 	FanSpeedPercent  float64 `json:"fan_speed_percent"`
 }

@@ -25,7 +25,7 @@ Lightweight Linux metrics agent that scrapes `/proc` and `/sys` once per second 
 Collectors refresh every second and degrade gracefully when inputs are unreadable.
 
 - CPU: usage and per-core usage percent (averaged since boot from `/proc/stat`), temperature via hwmon CPU sensors, current frequency (MHz) from cpufreq, and `power_watt` from RAPL or hwmon when available.
-- GPU: best-effort single-card read. Usage from `/sys/class/drm/*/gpu_busy_percent`, VRAM total/used in GB from `mem_info_vram_*`, temperature/power from hwmon GPU nodes; returned as a slice even if there is only one GPU.
+- GPU: discovers DRM cards under `/sys/class/drm/card*` (skips render nodes) and reports vendor/model (using PCI IDs where possible), per-card name, `core_usage_percent` from `gpu_busy_percent`, VRAM total/used/percent from `mem_info_vram_*`, temperature/power from hwmon, and `fan_speed_percent` when PWM or fan RPM are readable. Still returned as a slice even for a single GPU.
 - Memory: total, available, used, and swap total/free/used in GiB from `/proc/meminfo`.
 - Disk: enumerates block devices under `/sys/class/block` (skips loop/ram/dm). For each disk it reports `raw_size_gb` and temperature via `/sys/block/<disk>/device` hwmon, plus per-filesystem usage for each mounted partition discovered in `/proc/self/mountinfo`. Filesystem entries include device name, mountpoint, total/used/free, and percent used.
 - Network: aggregate of non-loopback interfaces from `/proc/net/dev` with cumulative `rx_bytes`/`tx_bytes` and Mbps rates computed between samples (first sample reports `0` speeds).
@@ -47,15 +47,16 @@ Collectors refresh every second and degrade gracefully when inputs are unreadabl
   "gpu": [
     {
       "id": 0,
+      "card": "card0",
       "vendor": "AMD",
-      "model": "RX 6600",
+      "model": "Radeon 6800 XT",
       "temperature": 48.3,
-      "usage": 15.7,
+      "core_usage_percent": 15.7,
       "vram_total_gb": 8.0,
       "vram_used_gb": 2.1,
-      "vram_usage_percent": 0,
+      "vram_percent": 26.2,
       "power_watt": 65.2,
-      "fan_speed_percent": 0
+      "fan_speed_percent": 38.0
     }
   ],
   "memory": {
