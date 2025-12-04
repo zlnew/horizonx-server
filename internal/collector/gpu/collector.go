@@ -1,20 +1,21 @@
-// Package gpu
 package gpu
 
 import (
 	"context"
 
 	"zlnew/monitor-agent/internal/core"
+	"zlnew/monitor-agent/internal/infra/logger"
 )
 
-func NewCollector() *Collector {
+func NewCollector(log logger.Logger) *Collector {
 	return &Collector{
+		log:      log,
 		powerEMA: make(map[string]*core.EMA),
 	}
 }
 
 func (c *Collector) Collect(ctx context.Context) ([]GPUMetric, error) {
-	cards := detectGPUs()
+	cards := c.detectGPUs()
 	var outputs []GPUMetric
 
 	for i, card := range cards {
@@ -22,14 +23,14 @@ func (c *Collector) Collect(ctx context.Context) ([]GPUMetric, error) {
 			c.powerEMA[card] = core.NewEMA(0.3)
 		}
 
-		vendor := readVendor(card)
-		model := readModel(card)
+		vendor := c.readVendor(card)
+		model := c.readModel(card)
 
-		temp := readTemperature(card)
-		usage := readCoreUsage(card)
-		vramTotal, vramUsed, vramPercent := readVRAM(card)
+		temp := c.readTemperature(card)
+		usage := c.readCoreUsage(card)
+		vramTotal, vramUsed, vramPercent := c.readVRAM(card)
 		powerWatt := c.readPower(card)
-		fanSpeed := readFanSpeedPercent(card)
+		fanSpeed := c.readFanSpeedPercent(card)
 
 		outputs = append(outputs, GPUMetric{
 			ID:               i,

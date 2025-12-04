@@ -3,7 +3,7 @@ package network
 import "time"
 
 func (c *Collector) collectMetric() (NetworkMetric, error) {
-	rx, tx, err := readTotals()
+	rx, tx, err := c.readTotals()
 	if err != nil {
 		return NetworkMetric{}, err
 	}

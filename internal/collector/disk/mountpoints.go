@@ -7,9 +7,10 @@ import (
 	"strings"
 )
 
-func findMountpointsByDeviceName(devName string) []string {
+func (c *Collector) findMountpointsByDeviceName(devName string) []string {
 	f, err := os.Open("/proc/self/mountinfo")
 	if err != nil {
+		c.log.Warn("failed to open /proc/self/mountinfo", "error", err)
 		return nil
 	}
 	defer f.Close()
@@ -35,6 +36,10 @@ func findMountpointsByDeviceName(devName string) []string {
 		if base == devName {
 			result = append(result, mountpoint)
 		}
+	}
+
+	if err := scanner.Err(); err != nil {
+		c.log.Warn("error reading /proc/self/mountinfo", "error", err)
 	}
 
 	return result

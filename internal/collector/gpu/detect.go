@@ -5,9 +5,10 @@ import (
 	"strings"
 )
 
-func detectGPUs() []string {
+func (c *Collector) detectGPUs() []string {
 	entries, err := os.ReadDir("/sys/class/drm")
 	if err != nil {
+		c.log.Warn("failed to read /sys/class/drm", "error", err)
 		return nil
 	}
 

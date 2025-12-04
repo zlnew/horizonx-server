@@ -19,12 +19,13 @@ func isPartition(name string) bool {
 		mmcPartition.MatchString(name)
 }
 
-func detectBlockDevices() ([]string, []string, error) {
+func (c *Collector) detectBlockDevices() ([]string, []string, error) {
 	var disks []string
 	var parts []string
 
 	entries, err := os.ReadDir("/sys/class/block")
 	if err != nil {
+		c.log.Error("failed to read /sys/class/block", "error", err)
 		return nil, nil, err
 	}
 
@@ -47,10 +48,11 @@ func detectBlockDevices() ([]string, []string, error) {
 	return disks, parts, nil
 }
 
-func getParentDisk(part string) string {
+func (c *Collector) getParentDisk(part string) string {
 	base := "/sys/class/block"
 	entries, err := os.ReadDir(base)
 	if err != nil {
+		c.log.Warn("failed to read /sys/class/block in getParentDisk", "error", err)
 		return ""
 	}
 
@@ -59,6 +61,8 @@ func getParentDisk(part string) string {
 		path := filepath.Join(base, disk, part)
 		if _, err := os.Stat(path); err == nil {
 			return disk
+		} else if !os.IsNotExist(err) {
+			c.log.Debug("failed to stat parent disk path", "path", path, "error", err)
 		}
 	}
 

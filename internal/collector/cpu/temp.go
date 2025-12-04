@@ -9,8 +9,13 @@ import (
 	"zlnew/monitor-agent/pkg"
 )
 
-func readTemperature() float64 {
-	matches, _ := filepath.Glob("/sys/class/hwmon/hwmon*/temp*_input")
+func (c *Collector) readTemperature() float64 {
+	matches, err := filepath.Glob("/sys/class/hwmon/hwmon*/temp*_input")
+	if err != nil {
+		c.log.Warn("failed to glob for hwmon temp files", "error", err)
+		return 0
+	}
+
 	targets := []string{
 		"coretemp",
 		"k10temp",
@@ -26,6 +31,7 @@ func readTemperature() float64 {
 
 		nameBytes, err := os.ReadFile(namePath)
 		if err != nil {
+			c.log.Debug("failed to read hwmon name", "path", namePath, "error", err)
 			continue
 		}
 
@@ -36,8 +42,13 @@ func readTemperature() float64 {
 
 		b, err := os.ReadFile(f)
 		if err == nil {
-			v, _ := strconv.ParseFloat(strings.TrimSpace(string(b)), 64)
-			return v / 1e3
+			if v, err := strconv.ParseFloat(strings.TrimSpace(string(b)), 64); err == nil {
+				return v / 1e3
+			} else {
+				c.log.Warn("failed to parse temperature", "file", f, "error", err)
+			}
+		} else {
+			c.log.Debug("failed to read temp input", "file", f, "error", err)
 		}
 	}
 

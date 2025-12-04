@@ -28,6 +28,7 @@ func main() {
 
 	a := agent.New(log, cfg)
 	if err := a.Run(ctx); err != nil {
-		log.Fatal("agent stopped with error:", err)
+		log.Error("agent stopped with error", "error", err)
+		os.Exit(1)
 	}
 }

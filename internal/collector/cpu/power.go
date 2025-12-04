@@ -15,8 +15,12 @@ func (c *Collector) readPowerWatt() float64 {
 
 	if watt, err := c.readRAPL(); err == nil && watt > 0 {
 		raw = watt
-	} else if watt, err := readHwmon(); err == nil && watt > 0 {
+	} else if err != nil {
+		c.log.Debug("failed to read RAPL power", "error", err)
+	} else if watt, err := c.readHwmon(); err == nil && watt > 0 {
 		raw = watt
+	} else if err != nil {
+		c.log.Debug("failed to read hwmon power", "error", err)
 	}
 
 	ema := c.powerEMA
@@ -34,7 +38,10 @@ func (c *Collector) readRAPL() (float64, error) {
 		return 0, err
 	}
 
-	energy, _ := strconv.ParseUint(strings.TrimSpace(string(b)), 10, 64)
+	energy, err := strconv.ParseUint(strings.TrimSpace(string(b)), 10, 64)
+	if err != nil {
+		return 0, err
+	}
 
 	now := time.Now()
 	if c.lastEnergy == 0 {
@@ -58,8 +65,11 @@ func (c *Collector) readRAPL() (float64, error) {
 	return watt, nil
 }
 
-func readHwmon() (float64, error) {
-	matches, _ := filepath.Glob("/sys/class/hwmon/hwmon*/power*_input")
+func (c *Collector) readHwmon() (float64, error) {
+	matches, err := filepath.Glob("/sys/class/hwmon/hwmon*/power*_input")
+	if err != nil {
+		return 0, err
+	}
 	targets := []string{
 		"zenpower",
 		"zenpower3",
@@ -76,6 +86,7 @@ func readHwmon() (float64, error) {
 
 		nameBytes, err := os.ReadFile(namePath)
 		if err != nil {
+			c.log.Debug("failed to read hwmon name for power", "path", namePath, "error", err)
 			continue
 		}
 
@@ -86,10 +97,17 @@ func readHwmon() (float64, error) {
 
 		b, err := os.ReadFile(f)
 		if err == nil {
-			v, _ := strconv.ParseFloat(strings.TrimSpace(string(b)), 64)
+			v, err := strconv.ParseFloat(strings.TrimSpace(string(b)), 64)
+			if err != nil {
+				c.log.Warn("failed to parse hwmon power", "file", f, "error", err)
+				continue
+			}
 			return v / 1e6, nil
+		} else {
+			c.log.Debug("failed to read power input", "file", f, "error", err)
 		}
 	}
 
+	c.log.Debug("no suitable hwmon power input found")
 	return 0, nil
 }

@@ -8,15 +8,17 @@ import (
 	"syscall"
 )
 
-func readRawSizeGiB(disk string) float64 {
+func (c *Collector) readRawSizeGiB(disk string) float64 {
 	sizeFile := filepath.Join("/sys/block", disk, "size")
 	b, err := os.ReadFile(sizeFile)
 	if err != nil {
+		c.log.Warn("failed to read disk size", "disk", disk, "error", err)
 		return 0
 	}
 
 	sectors, err := strconv.ParseUint(strings.TrimSpace(string(b)), 10, 64)
 	if err != nil {
+		c.log.Warn("failed to parse disk size", "disk", disk, "error", err)
 		return 0
 	}
 
@@ -25,10 +27,11 @@ func readRawSizeGiB(disk string) float64 {
 	return bytes / gib
 }
 
-func readFSUsage(mountpoint string, devName string) FilesystemUsage {
+func (c *Collector) readFSUsage(mountpoint string, devName string) FilesystemUsage {
 	var fs syscall.Statfs_t
 
 	if err := syscall.Statfs(mountpoint, &fs); err != nil {
+		c.log.Warn("failed to stat filesystem", "mountpoint", mountpoint, "error", err)
 		return FilesystemUsage{
 			Device:     devName,
 			Mountpoint: mountpoint,

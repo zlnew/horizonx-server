@@ -5,9 +5,11 @@ import (
 	"strings"
 )
 
-func readVendor(card string) string {
-	b, err := os.ReadFile("/sys/class/drm/" + card + "/device/vendor")
+func (c *Collector) readVendor(card string) string {
+	path := "/sys/class/drm/" + card + "/device/vendor"
+	b, err := os.ReadFile(path)
 	if err != nil {
+		c.log.Debug("failed to read gpu vendor", "path", path, "error", err)
 		return "unknown"
 	}
 

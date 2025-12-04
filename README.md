@@ -14,20 +14,37 @@ Lightweight Linux metrics agent that scrapes `/proc` and `/sys` and can either e
 
 ## Configuration
 
-The agent can be configured via environment variables or a `.env` file.
+The agent can be configured via environment variables, which can also be specified in a `.env` file at the root of the project.
 
-| Variable          | Description                                                | Default |
-| ----------------- | ---------------------------------------------------------- | ------- |
-| `HTTP_ADDR`       | Address for the HTTP server in `serve` mode.               | `:3000` |
-| `SCRAPE_INTERVAL` | Metric collection interval for `stream` and `serve` modes. | `1s`    |
+| Variable          | Description                                                                                                                          | Default |
+| ----------------- | ------------------------------------------------------------------------------------------------------------------------------------ | ------- |
+| `HTTP_ADDR`       | Sets the address and port for the HTTP server in `serve` mode (e.g., `:8080`).                                                       | `:3000` |
+| `SCRAPE_INTERVAL` | Defines the interval for metric collection in `stream` and `serve` modes. This should be a duration string, such as `1s` or `500ms`. | `1s`    |
+| `LOG_LEVEL`       | Sets the logging level. Supported values are `debug`, `info`, `warn`, and `error`.                                                   | `info`  |
+| `LOG_FORMAT`      | Determines the log output format. Supported values are `text` and `json`.                                                            | `text`  |
 
-## Run, build, test
+## Building and Running
 
-- Run locally: `go run ./cmd/agent` or `go run ./cmd/agent serve`.
-- Modes: `monitor-agent serve` (HTTP with `/metrics`), `monitor-agent stream` (continuous JSON lines to stdout), `monitor-agent snapshot` (one JSON to stdout).
-- Build: `go build -o bin/monitor-agent ./cmd/agent` or `make build`.
-- Clean build artifact: `make clean`.
-- Tests: `go test ./...` (none yet).
+### Commands
+
+The project includes a `Makefile` that simplifies common tasks, but standard Go commands can also be used.
+
+- **To run the agent locally**:
+  - `go run ./cmd/agent [mode]`
+  - Where `[mode]` can be `snapshot`, `stream`, or `serve`.
+  - If no mode is specified, it defaults to `serve`.
+
+- **To build the agent**:
+  - `make build`
+  - This command compiles the agent and places the binary at `bin/monitor-agent`.
+
+- **To run tests**:
+  - `go test ./...`
+  - (Note: The `README.md` indicates that there are currently no tests.)
+
+- **To clean the build artifacts**:
+  - `make clean`
+  - This removes the `bin` directory.
 
 ## Metrics
 
@@ -115,4 +132,3 @@ Collectors refresh every second and degrade gracefully when inputs are unreadabl
 
 - The HTTP server runs until process exit; the scheduler stops when context is canceled.
 - Build artifacts land in `bin/`; avoid committing binaries unless intentional.
-

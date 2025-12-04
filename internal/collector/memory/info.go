@@ -15,6 +15,7 @@ func (c *Collector) readMemInfo() error {
 
 	file, err := os.Open("/proc/meminfo")
 	if err != nil {
+		c.log.Error("failed to open /proc/meminfo", "error", err)
 		return err
 	}
 	defer file.Close()
@@ -29,6 +30,7 @@ func (c *Collector) readMemInfo() error {
 		key := strings.TrimSuffix(fields[0], ":")
 		valueKB, err := strconv.ParseUint(fields[1], 10, 64)
 		if err != nil {
+			c.log.Warn("failed to parse meminfo value", "line", scanner.Text(), "error", err)
 			continue
 		}
 
@@ -42,6 +44,10 @@ func (c *Collector) readMemInfo() error {
 		case "SwapFree":
 			c.swapFree = valueKB * 1024
 		}
+	}
+
+	if err := scanner.Err(); err != nil {
+		c.log.Warn("error reading /proc/meminfo", "error", err)
 	}
 
 	return nil

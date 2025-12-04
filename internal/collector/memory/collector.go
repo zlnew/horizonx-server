@@ -1,10 +1,13 @@
-// Package memory
 package memory
 
-import "context"
+import (
+	"context"
 
-func NewCollector() *Collector {
-	return &Collector{}
+	"zlnew/monitor-agent/internal/infra/logger"
+)
+
+func NewCollector(log logger.Logger) *Collector {
+	return &Collector{log: log}
 }
 
 func (c *Collector) Collect(ctx context.Context) (MemoryMetric, error) {

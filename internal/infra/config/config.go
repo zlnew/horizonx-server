@@ -9,9 +9,11 @@ import (
 )
 
 type Config struct {
-	Address  string
-	Mode     string
-	Interval time.Duration
+	Address   string
+	Mode      string
+	Interval  time.Duration
+	LogLevel  string
+	LogFormat string
 }
 
 const (
@@ -35,5 +37,21 @@ func Load() *Config {
 		}
 	}
 
-	return &Config{Address: addr, Mode: ModeServe, Interval: interval}
+	logLevel := os.Getenv("LOG_LEVEL")
+	if logLevel == "" {
+		logLevel = "info"
+	}
+
+	logFormat := os.Getenv("LOG_FORMAT")
+	if logFormat == "" {
+		logFormat = "text"
+	}
+
+	return &Config{
+		Address:   addr,
+		Mode:      ModeServe,
+		Interval:  interval,
+		LogLevel:  logLevel,
+		LogFormat: logFormat,
+	}
 }

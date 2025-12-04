@@ -7,9 +7,10 @@ import (
 	"strings"
 )
 
-func readTotals() (uint64, uint64, error) {
+func (c *Collector) readTotals() (uint64, uint64, error) {
 	f, err := os.Open("/proc/net/dev")
 	if err != nil {
+		c.log.Error("failed to open /proc/net/dev", "error", err)
 		return 0, 0, err
 	}
 	defer f.Close()
@@ -37,19 +38,24 @@ func readTotals() (uint64, uint64, error) {
 			continue
 		}
 
-		rxBytes := parseUint(parts[1])
-		txBytes := parseUint(parts[9])
+		rxBytes := c.parseUint(parts[1])
+		txBytes := c.parseUint(parts[9])
 
 		rxTotal += rxBytes
 		txTotal += txBytes
 	}
 
+	if err := scanner.Err(); err != nil {
+		c.log.Warn("error reading /proc/net/dev", "error", err)
+	}
+
 	return rxTotal, txTotal, nil
 }
 
-func parseUint(s string) uint64 {
+func (c *Collector) parseUint(s string) uint64 {
 	v, err := strconv.ParseUint(s, 10, 64)
 	if err != nil {
+		c.log.Warn("failed to parse network stats", "value", s, "error", err)
 		return 0
 	}
 	return v

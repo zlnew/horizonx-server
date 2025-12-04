@@ -1,8 +1,12 @@
 package gpu
 
-import "zlnew/monitor-agent/internal/core"
+import (
+	"zlnew/monitor-agent/internal/core"
+	"zlnew/monitor-agent/internal/infra/logger"
+)
 
 type Collector struct {
+	log      logger.Logger
 	powerEMA map[string]*core.EMA
 }
 

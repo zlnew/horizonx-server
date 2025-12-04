@@ -25,12 +25,12 @@ type Sampler struct {
 
 func NewSampler(log logger.Logger) *Sampler {
 	return &Sampler{
-		cpu:     cpu.NewCollector(),
-		gpu:     gpu.NewCollector(),
-		memory:  memory.NewCollector(),
-		disk:    disk.NewCollector(),
-		network: network.NewCollector(),
-		uptime:  uptime.NewCollector(),
+		cpu:     cpu.NewCollector(log),
+		gpu:     gpu.NewCollector(log),
+		memory:  memory.NewCollector(log),
+		disk:    disk.NewCollector(log),
+		network: network.NewCollector(log),
+		uptime:  uptime.NewCollector(log),
 		log:     log,
 	}
 }
