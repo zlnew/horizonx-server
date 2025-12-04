@@ -12,12 +12,19 @@ Lightweight Linux metrics agent that scrapes `/proc` and `/sys` and can either e
   - NVMe hwmon temperature for disk temperature.
 - Missing files are tolerated; collectors will emit zero values instead of failing.
 
+## Configuration
+
+The agent can be configured via environment variables or a `.env` file.
+
+| Variable          | Description                                                | Default |
+| ----------------- | ---------------------------------------------------------- | ------- |
+| `HTTP_ADDR`       | Address for the HTTP server in `serve` mode.               | `:3000` |
+| `SCRAPE_INTERVAL` | Metric collection interval for `stream` and `serve` modes. | `1s`    |
+
 ## Run, build, test
 
-- Run locally: `go run ./cmd/agent` or `go run ./cmd/agent serve` (binds to `:3000`).
+- Run locally: `go run ./cmd/agent` or `go run ./cmd/agent serve`.
 - Modes: `monitor-agent serve` (HTTP with `/metrics`), `monitor-agent stream` (continuous JSON lines to stdout), `monitor-agent snapshot` (one JSON to stdout).
-- Configure address: set `HTTP_ADDR` in the env or a `.env` file, e.g. `HTTP_ADDR=:8080`.
-- Scrape interval: `SCRAPE_INTERVAL` duration string (default `1s`) for stream/serve modes.
 - Build: `go build -o bin/monitor-agent ./cmd/agent` or `make build`.
 - Clean build artifact: `make clean`.
 - Tests: `go test ./...` (none yet).
@@ -108,3 +115,4 @@ Collectors refresh every second and degrade gracefully when inputs are unreadabl
 
 - The HTTP server runs until process exit; the scheduler stops when context is canceled.
 - Build artifacts land in `bin/`; avoid committing binaries unless intentional.
+
