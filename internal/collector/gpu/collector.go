@@ -7,7 +7,7 @@ func NewCollector() *Collector {
 	return &Collector{}
 }
 
-func (c *Collector) Collect(ctx context.Context) (any, error) {
+func (c *Collector) Collect(ctx context.Context) ([]GPUMetric, error) {
 	cards := detectGPUs()
 	var out []GPUMetric
 

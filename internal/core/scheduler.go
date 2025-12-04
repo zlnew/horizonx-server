@@ -8,40 +8,37 @@ import (
 )
 
 type Scheduler struct {
-	reg      *Registry
 	interval time.Duration
 	log      logger.Logger
+	sample   func(context.Context) Metrics
+	sink     func(Metrics)
 }
 
-func NewScheduler(reg *Registry, interval time.Duration, log logger.Logger) *Scheduler {
-	return &Scheduler{reg, interval, log}
+func NewScheduler(interval time.Duration, log logger.Logger, sample func(context.Context) Metrics, sink func(Metrics)) *Scheduler {
+	return &Scheduler{interval: interval, log: log, sample: sample, sink: sink}
 }
 
 func (s *Scheduler) Start(ctx context.Context) {
 	ticker := time.NewTicker(s.interval)
 	defer ticker.Stop()
 
+	s.tick(ctx)
+
 	for {
 		select {
 		case <-ticker.C:
-			s.collect(ctx)
+			s.tick(ctx)
 		case <-ctx.Done():
 			return
 		}
 	}
 }
 
-func (s *Scheduler) collect(ctx context.Context) {
-	s.reg.mu.RLock()
-	collectors := s.reg.collectors
-	s.reg.mu.RUnlock()
-
-	for name, c := range collectors {
-		val, err := c.Collect(ctx)
-		if err == nil {
-			s.reg.Update(name, val)
-		} else {
-			s.log.Error("collector", "name", name, "error", err)
-		}
+func (s *Scheduler) tick(ctx context.Context) {
+	if s.sample == nil || s.sink == nil {
+		return
 	}
+
+	metrics := s.sample(ctx)
+	s.sink(metrics)
 }

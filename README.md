@@ -1,6 +1,6 @@
 # go-monitor-agent
 
-Lightweight Linux metrics agent that scrapes `/proc` and `/sys` once per second and exposes a JSON snapshot at `/metrics`. Collectors are defensive: unreadable files just zero the value so the agent keeps running.
+Lightweight Linux metrics agent that scrapes `/proc` and `/sys` and can either emit a single snapshot, stream snapshots, or serve the latest JSON at `/metrics`. Collectors are defensive: unreadable files just zero the value so the agent keeps running.
 
 ## Requirements
 
@@ -14,8 +14,10 @@ Lightweight Linux metrics agent that scrapes `/proc` and `/sys` once per second 
 
 ## Run, build, test
 
-- Run locally: `go run ./cmd/agent` (binds to `:3000`).
+- Run locally: `go run ./cmd/agent` or `go run ./cmd/agent serve` (binds to `:3000`).
+- Modes: `monitor-agent serve` (HTTP with `/metrics`), `monitor-agent stream` (continuous JSON lines to stdout), `monitor-agent snapshot` (one JSON to stdout).
 - Configure address: set `HTTP_ADDR` in the env or a `.env` file, e.g. `HTTP_ADDR=:8080`.
+- Scrape interval: `SCRAPE_INTERVAL` duration string (default `1s`) for stream/serve modes.
 - Build: `go build -o bin/monitor-agent ./cmd/agent` or `make build`.
 - Clean build artifact: `make clean`.
 - Tests: `go test ./...` (none yet).

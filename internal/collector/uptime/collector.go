@@ -14,7 +14,7 @@ func NewCollector() *Collector {
 	return &Collector{}
 }
 
-func (c *Collector) Collect(ctx context.Context) (any, error) {
+func (c *Collector) Collect(ctx context.Context) (float64, error) {
 	data, err := os.ReadFile("/proc/uptime")
 	if err != nil {
 		return float64(0), err

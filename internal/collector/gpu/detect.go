@@ -21,4 +21,3 @@ func detectGPUs() []string {
 
 	return cards
 }
-

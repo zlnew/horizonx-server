@@ -7,7 +7,7 @@ func NewCollector() *Collector {
 	return &Collector{}
 }
 
-func (c *Collector) Collect(ctx context.Context) (any, error) {
+func (c *Collector) Collect(ctx context.Context) ([]DiskMetric, error) {
 	disks, parts, err := detectBlockDevices()
 	if err != nil {
 		return nil, err

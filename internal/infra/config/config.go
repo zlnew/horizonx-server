@@ -3,13 +3,22 @@ package config
 
 import (
 	"os"
+	"time"
 
 	"github.com/joho/godotenv"
 )
 
 type Config struct {
-	Address string
+	Address  string
+	Mode     string
+	Interval time.Duration
 }
+
+const (
+	ModeServe    = "serve"
+	ModeStream   = "stream"
+	ModeSnapshot = "snapshot"
+)
 
 func Load() *Config {
 	godotenv.Load()
@@ -18,5 +27,13 @@ func Load() *Config {
 	if addr == "" {
 		addr = ":3000"
 	}
-	return &Config{Address: addr}
+
+	interval := time.Second
+	if raw := os.Getenv("SCRAPE_INTERVAL"); raw != "" {
+		if parsed, err := time.ParseDuration(raw); err == nil && parsed > 0 {
+			interval = parsed
+		}
+	}
+
+	return &Config{Address: addr, Mode: ModeServe, Interval: interval}
 }

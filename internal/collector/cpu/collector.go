@@ -9,7 +9,7 @@ func NewCollector() *Collector {
 	return &Collector{}
 }
 
-func (c *Collector) Collect(ctx context.Context) (any, error) {
+func (c *Collector) Collect(ctx context.Context) (CPUMetric, error) {
 	usage, perCore := getUsage()
 	temperature := getTemperature()
 	frequency := getFrequency()
