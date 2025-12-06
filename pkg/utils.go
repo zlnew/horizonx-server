@@ -1,4 +1,4 @@
-// Package internal/core/metrics
+// Package pkg
 package pkg
 
 import "strings"
