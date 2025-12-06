@@ -61,6 +61,8 @@ Collectors refresh every second and degrade gracefully when inputs are unreadabl
 
 `GET /metrics` returns the latest snapshot:
 
+`GET /ws` upgrades the connection to a websocket and streams the latest snapshot at the `SCRAPE_INTERVAL`.
+
 ```json
 {
   "cpu": {
