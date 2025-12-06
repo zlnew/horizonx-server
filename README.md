@@ -1,6 +1,6 @@
 # go-monitor-agent
 
-Lightweight Linux metrics agent that scrapes `/proc` and `/sys` and can either emit a single snapshot, stream snapshots, or serve the latest JSON at `/metrics`. Collectors are defensive: unreadable files just zero the value so the agent keeps running.
+Lightweight Linux metrics agent that scrapes `/proc` and `/sys` and can either emit a single snapshot, stream snapshots, or serve the latest JSON at `/metrics` and via websockets. Collectors are defensive: unreadable files just zero the value so the agent keeps running.
 
 ## Requirements
 
@@ -48,85 +48,96 @@ The project includes a `Makefile` that simplifies common tasks, but standard Go 
 
 ## Metrics
 
-Collectors refresh every second and degrade gracefully when inputs are unreadable.
+Collectors refresh at the `SCRAPE_INTERVAL` and degrade gracefully when inputs are unreadable. To provide more stable and meaningful values, an Exponential Moving Average (EMA) is applied to spiky metrics like CPU usage, GPU usage, and network speed.
 
-- CPU: usage and per-core usage percent (averaged since boot from `/proc/stat`), temperature via hwmon CPU sensors, current frequency (MHz) from cpufreq, and `power_watt` from RAPL or hwmon when available.
-- GPU: discovers DRM cards under `/sys/class/drm/card*` (skips render nodes) and reports vendor/model (using PCI IDs where possible), per-card name, `core_usage_percent` from `gpu_busy_percent`, VRAM total/used/percent from `mem_info_vram_*`, temperature/power from hwmon, and `fan_speed_percent` when PWM or fan RPM are readable. Still returned as a slice even for a single GPU.
-- Memory: total, available, used, and swap total/free/used in GiB from `/proc/meminfo`.
-- Disk: enumerates block devices under `/sys/class/block` (skips loop/ram/dm). For each disk it reports `raw_size_gb` and temperature via `/sys/block/<disk>/device` hwmon, plus per-filesystem usage for each mounted partition discovered in `/proc/self/mountinfo`. Filesystem entries include device name, mountpoint, total/used/free, and percent used.
-- Network: aggregate of non-loopback interfaces from `/proc/net/dev` with cumulative `rx_bytes`/`tx_bytes` and Mbps rates computed between samples (first sample reports `0` speeds).
-- Uptime: `uptime_seconds` from `/proc/uptime`.
+- **CPU**: current usage and per-core usage percent, temperature via hwmon CPU sensors, current frequency (MHz) from cpufreq, and `power_watt` from RAPL or hwmon when available.
+- **GPU**: discovers DRM cards under `/sys/class/drm/card*` (skips render nodes) and reports vendor/model (using PCI IDs where possible), per-card name, `core_usage_percent`, VRAM total/used/percent from `mem_info_vram_*`, temperature/power from hwmon, and `fan_speed_percent` when PWM or fan RPM are readable. Still returned as a slice even for a single GPU.
+- **Memory**: total, available, used, and swap total/free/used in GiB from `/proc/meminfo`.
+- **Disk**: enumerates block devices under `/sys/class/block` (skips loop/ram/dm). For each disk it reports `raw_size_gb` and temperature via `/sys/block/<disk>/device` hwmon, plus per-filesystem usage for each mounted partition discovered in `/proc/self/mountinfo`. Filesystem entries include device name, mountpoint, total/used/free, and percent used.
+- **Network**: aggregate of non-loopback interfaces from `/proc/net/dev` with cumulative `rx_bytes`/`tx_bytes` and Mbps rates computed between samples.
+- **Uptime**: `uptime_seconds` from `/proc/uptime`.
 
-### Endpoint
+### Endpoints
 
-`GET /metrics` returns the latest snapshot:
+#### `GET /metrics`
 
-`GET /ws` upgrades the connection to a websocket and streams the latest snapshot at the `SCRAPE_INTERVAL`.
+Returns the latest snapshot of all metrics.
+
+#### `GET /ws`
+
+Upgrades the connection to a websocket to stream metrics. The websocket uses a channel-based system. To receive metrics, the client must send a JSON message to subscribe to the `metrics` channel.
+
+**Subscribe Message:**
 
 ```json
 {
-  "cpu": {
-    "usage": 12.5,
-    "per_core": [8.2, 14.1, 13.3, 9.9],
-    "temperature": 55.0,
-    "frequency": 2200.0,
-    "power_watt": 7.8
-  },
-  "gpu": [
-    {
-      "id": 0,
-      "card": "card0",
-      "vendor": "AMD",
-      "model": "Radeon 6800 XT",
-      "temperature": 48.3,
-      "core_usage_percent": 15.7,
-      "vram_total_gb": 8.0,
-      "vram_used_gb": 2.1,
-      "vram_percent": 26.2,
-      "power_watt": 65.2,
-      "fan_speed_percent": 38.0
-    }
-  ],
-  "memory": {
-    "total_gb": 15.8,
-    "used_gb": 6.4,
-    "available_gb": 9.4,
-    "swap_total_gb": 2.0,
-    "swap_free_gb": 2.0,
-    "swap_used_gb": 0.0
-  },
-  "disk": [
-    {
-      "name": "nvme0n1",
-      "raw_size_gb": 953.8,
-      "temperature": 41.5,
-      "filesystems": [
-        {
-          "device": "nvme0n1p2",
-          "mountpoint": "/",
-          "total_gb": 476.3,
-          "used_gb": 174.2,
-          "free_gb": 302.1,
-          "percent": 56.0
-        },
-        {
-          "device": "nvme0n1p3",
-          "mountpoint": "/home",
-          "total_gb": 447.5,
-          "used_gb": 120.2,
-          "free_gb": 327.3,
-          "percent": 26.8
-        }
-      ]
-    }
-  ],
-  "network": {
-    "rx_bytes": 123456789,
-    "tx_bytes": 987654321,
-    "rx_speed": 1.2,
-    "tx_speed": 8.5
-  },
-  "uptime_seconds": 12345
+  "type": "subscribe",
+  "channel": "metrics"
+}
+```
+
+**Broadcast Message:**
+The server will then stream messages with the following format:
+
+```json
+{
+  "channel": "metrics",
+  "payload": {
+    "cpu": {
+      "usage": 12.5,
+      "per_core": [8.2, 14.1, 13.3, 9.9],
+      "temperature": 55.0,
+      "frequency": 2200.0,
+      "power_watt": 7.8
+    },
+    "gpu": [
+      {
+        "id": 0,
+        "card": "card0",
+        "vendor": "AMD",
+        "model": "Radeon 6800 XT",
+        "temperature": 48.3,
+        "core_usage_percent": 15.7,
+        "vram_total_gb": 8.0,
+        "vram_used_gb": 2.1,
+        "vram_percent": 26.2,
+        "power_watt": 65.2,
+        "fan_speed_percent": 38.0
+      }
+    ],
+    "memory": {
+      "total_gb": 15.8,
+      "used_gb": 6.4,
+      "available_gb": 9.4,
+      "swap_total_gb": 2.0,
+      "swap_free_gb": 2.0,
+      "swap_used_gb": 0.0
+    },
+    "disk": [
+      {
+        "name": "nvme0n1",
+        "raw_size_gb": 953.8,
+        "temperature": 41.5,
+        "filesystems": [
+          {
+            "device": "nvme0n1p2",
+            "mountpoint": "/",
+            "total_gb": 476.3,
+            "used_gb": 174.2,
+            "free_gb": 302.1,
+            "percent": 56.0
+          }
+        ]
+      }
+    ],
+    "network": {
+      "rx_bytes": 123456789,
+      "tx_bytes": 987654321,
+      "rx_speed": 1.2,
+      "tx_speed": 8.5
+    },
+    "uptime_seconds": 12345
+  }
 }
 ```
 
