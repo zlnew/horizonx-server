@@ -1,4 +1,4 @@
-module zlnew/monitor-agent
+module horizonx-server
 
 go 1.25.4
 

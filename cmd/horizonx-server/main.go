@@ -1,0 +1,69 @@
+package main
+
+import (
+	"context"
+	"errors"
+	"net/http"
+	"os/signal"
+	"syscall"
+	"time"
+
+	"horizonx-server/api/rest"
+	"horizonx-server/internal/config"
+	"horizonx-server/internal/core"
+	"horizonx-server/internal/core/metrics"
+	"horizonx-server/internal/logger"
+	"horizonx-server/internal/store"
+	"horizonx-server/internal/transport/websocket"
+	"horizonx-server/pkg/types"
+)
+
+func main() {
+	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
+	defer stop()
+
+	cfg := config.Load()
+	log := logger.New(cfg)
+
+	// Metrics components
+	store := store.NewSnapshotStore()
+	hub := websocket.NewHub(log)
+	sampler := metrics.NewSampler(log)
+
+	// Scheduler for metrics collection
+	sched := core.NewScheduler(cfg.Interval, log, sampler.Collect, func(m types.Metrics) {
+		store.Set(m)
+		hub.BroadcastMetrics(m)
+	})
+	go sched.Start(ctx)
+	go hub.Run()
+
+	// HTTP server
+	router := rest.NewRouter(store, hub, log)
+	srv := &http.Server{
+		Addr:    cfg.Address,
+		Handler: router,
+	}
+
+	errCh := make(chan error, 1)
+	go func() {
+		log.Info("starting http server", "address", cfg.Address)
+		if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+			errCh <- err
+		}
+		close(errCh)
+	}()
+
+	select {
+	case <-ctx.Done():
+		shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		if err := srv.Shutdown(shutdownCtx); err != nil {
+			log.Error("http server shutdown error", "error", err)
+		}
+	case err := <-errCh:
+		log.Error("http server error", "error", err)
+	}
+
+	log.Info("server stopped")
+}

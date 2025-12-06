@@ -5,8 +5,8 @@ import (
 	"encoding/json"
 	"os"
 
-	"zlnew/monitor-agent/internal/core"
-	"zlnew/monitor-agent/internal/infra/config"
+	"horizonx-server/internal/config"
+	"horizonx-server/internal/core"
 )
 
 func (a *Agent) Run(ctx context.Context) error {

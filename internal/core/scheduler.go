@@ -4,17 +4,18 @@ import (
 	"context"
 	"time"
 
-	"zlnew/monitor-agent/internal/infra/logger"
+	"horizonx-server/internal/logger"
+	"horizonx-server/pkg/types"
 )
 
 type Scheduler struct {
 	interval time.Duration
 	log      logger.Logger
-	sample   func(context.Context) Metrics
-	sink     func(Metrics)
+	sample   func(context.Context) types.Metrics
+	sink     func(types.Metrics)
 }
 
-func NewScheduler(interval time.Duration, log logger.Logger, sample func(context.Context) Metrics, sink func(Metrics)) *Scheduler {
+func NewScheduler(interval time.Duration, log logger.Logger, sample func(context.Context) types.Metrics, sink func(types.Metrics)) *Scheduler {
 	return &Scheduler{interval: interval, log: log, sample: sample, sink: sink}
 }
 
@@ -39,6 +40,6 @@ func (s *Scheduler) tick(ctx context.Context) {
 		return
 	}
 
-	metrics := s.sample(ctx)
-	s.sink(metrics)
+	m := s.sample(ctx)
+	s.sink(m)
 }

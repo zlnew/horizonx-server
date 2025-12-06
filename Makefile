@@ -1,5 +1,5 @@
-APP_NAME=monitor-agent
-ENTRY=./cmd/agent
+APP_NAME=horizonx-server
+ENTRY=./cmd/horizonx-server
 
 build:
 	go build -o bin/$(APP_NAME) $(ENTRY)

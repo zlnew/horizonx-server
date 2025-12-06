@@ -2,10 +2,10 @@
 package agent
 
 import (
-	"zlnew/monitor-agent/internal/core"
-	"zlnew/monitor-agent/internal/infra/config"
-	"zlnew/monitor-agent/internal/infra/logger"
-	"zlnew/monitor-agent/internal/transport/http"
+	"horizonx-server/internal/config"
+	"horizonx-server/internal/core"
+	"horizonx-server/internal/logger"
+	"horizonx-server/internal/transport/http"
 )
 
 type Agent struct {
