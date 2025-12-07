@@ -1,6 +1,13 @@
 // Package types
 package types
 
+type OSInfo struct {
+	Hostname      string `json:"hostname"`
+	Name          string `json:"name"`
+	KernelVersion string `json:"kernel_version"`
+	Arch          string `json:"arch"`
+}
+
 type CPUMetric struct {
 	Usage       float64   `json:"usage"`
 	PerCore     []float64 `json:"per_core"`
@@ -56,6 +63,7 @@ type NetworkMetric struct {
 }
 
 type Metrics struct {
+	OSInfo        OSInfo        `json:"os_info"`
 	CPU           CPUMetric     `json:"cpu"`
 	GPU           []GPUMetric   `json:"gpu"`
 	Memory        MemoryMetric  `json:"memory"`

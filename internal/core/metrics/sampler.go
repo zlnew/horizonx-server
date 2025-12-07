@@ -9,12 +9,14 @@ import (
 	"horizonx-server/internal/core/metrics/collector/gpu"
 	"horizonx-server/internal/core/metrics/collector/memory"
 	"horizonx-server/internal/core/metrics/collector/network"
+	"horizonx-server/internal/core/metrics/collector/os"
 	"horizonx-server/internal/core/metrics/collector/uptime"
 	"horizonx-server/internal/logger"
 	"horizonx-server/pkg/types"
 )
 
 type Sampler struct {
+	os      *os.Collector
 	cpu     *cpu.Collector
 	gpu     *gpu.Collector
 	memory  *memory.Collector
@@ -26,6 +28,7 @@ type Sampler struct {
 
 func NewSampler(log logger.Logger) *Sampler {
 	return &Sampler{
+		os:      os.NewCollector(log),
 		cpu:     cpu.NewCollector(log),
 		gpu:     gpu.NewCollector(log),
 		memory:  memory.NewCollector(log),
@@ -38,6 +41,12 @@ func NewSampler(log logger.Logger) *Sampler {
 
 func (s *Sampler) Collect(ctx context.Context) types.Metrics {
 	var metrics types.Metrics
+
+	if val, err := s.os.Collect(ctx); err != nil {
+		s.log.Error("collector", "name", "os", "error", err)
+	} else {
+		metrics.OSInfo = val
+	}
 
 	if val, err := s.cpu.Collect(ctx); err != nil {
 		s.log.Error("collector", "name", "cpu", "error", err)
