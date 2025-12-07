@@ -20,9 +20,10 @@ The agent can be configured via environment variables, which can also be specifi
 | Variable          | Description                                                                                            | Default |
 | ----------------- | ------------------------------------------------------------------------------------------------------ | ------- |
 | `HTTP_ADDR`       | Sets the address and port for the HTTP server (e.g., `:8080`).                                         | `:3000` |
-| `SCRAPE_INTERVAL` | Defines the interval for metric collection. This should be a duration string, such as `1s` or `500ms`. | `1s`    |
+| `SCRAPE_INTERVAL` | Defines the interval for metric collection. This should be a duration string, such as `1s` or `500ms`. | `3s`    |
 | `LOG_LEVEL`       | Sets the logging level. Supported values are `debug`, `info`, `warn`, and `error`.                     | `info`  |
 | `LOG_FORMAT`      | Determines the log output format. Supported values are `text` and `json`.                              | `text`  |
+| `ALLOWED_ORIGINS` | A comma-separated list of origins for CORS (e.g., `http://localhost:8000,https://yourdomain.com`)      |         |
 
 ## Building and Running
 

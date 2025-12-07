@@ -3,16 +3,18 @@ package config
 
 import (
 	"os"
+	"strings"
 	"time"
 
 	"github.com/joho/godotenv"
 )
 
 type Config struct {
-	Address   string
-	Interval  time.Duration
-	LogLevel  string
-	LogFormat string
+	Address        string
+	Interval       time.Duration
+	LogLevel       string
+	LogFormat      string
+	AllowedOrigins []string
 }
 
 func Load() *Config {
@@ -23,7 +25,7 @@ func Load() *Config {
 		addr = ":3000"
 	}
 
-	interval := time.Second
+	interval := 3 * time.Second
 	if raw := os.Getenv("SCRAPE_INTERVAL"); raw != "" {
 		if parsed, err := time.ParseDuration(raw); err == nil && parsed > 0 {
 			interval = parsed
@@ -40,10 +42,22 @@ func Load() *Config {
 		logFormat = "text"
 	}
 
+	var origins []string
+	rawOrigins := os.Getenv("ALLOWED_ORIGINS")
+	if rawOrigins != "" {
+		for o := range strings.SplitSeq(rawOrigins, ",") {
+			o = strings.TrimSpace(o)
+			if o != "" {
+				origins = append(origins, o)
+			}
+		}
+	}
+
 	return &Config{
-		Address:   addr,
-		Interval:  interval,
-		LogLevel:  logLevel,
-		LogFormat: logFormat,
+		Address:        addr,
+		Interval:       interval,
+		LogLevel:       logLevel,
+		LogFormat:      logFormat,
+		AllowedOrigins: origins,
 	}
 }

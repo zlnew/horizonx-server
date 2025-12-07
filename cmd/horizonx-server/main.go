@@ -25,12 +25,10 @@ func main() {
 	cfg := config.Load()
 	log := logger.New(cfg)
 
-	// Metrics components
 	store := store.NewSnapshotStore()
 	hub := websocket.NewHub(log)
 	sampler := metrics.NewSampler(log)
 
-	// Scheduler for metrics collection
 	sched := core.NewScheduler(cfg.Interval, log, sampler.Collect, func(m types.Metrics) {
 		store.Set(m)
 		hub.BroadcastMetrics(m)
@@ -38,8 +36,7 @@ func main() {
 	go sched.Start(ctx)
 	go hub.Run()
 
-	// HTTP server
-	router := rest.NewRouter(store, hub, log)
+	router := rest.NewRouter(cfg, store, hub, log)
 	srv := &http.Server{
 		Addr:    cfg.Address,
 		Handler: router,
