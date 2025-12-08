@@ -2,6 +2,7 @@ package handler
 
 import (
 	"encoding/json"
+	"errors"
 	"net/http"
 	"time"
 
@@ -42,13 +43,21 @@ func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := h.svc.Register(r.Context(), req); err != nil {
+		if errors.Is(err, auth.ErrEmailAlreadyExists) {
+			writeJSON(w, http.StatusConflict, APIResponse{
+				Message: "Email already registered",
+			})
+			return
+		}
+
 		writeJSON(w, http.StatusInternalServerError, APIResponse{
-			Message: err.Error(),
+			Message: "Something went wrong, please try again later",
 		})
+		return
 	}
 
 	writeJSON(w, http.StatusCreated, APIResponse{
-		Message: "User created successfully",
+		Message: "User created successfully.",
 	})
 }
 
@@ -63,8 +72,15 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 
 	res, err := h.svc.Login(r.Context(), req)
 	if err != nil {
-		writeJSON(w, http.StatusUnauthorized, APIResponse{
-			Message: err.Error(),
+		if errors.Is(err, auth.ErrInvalidCredentials) {
+			writeJSON(w, http.StatusUnauthorized, APIResponse{
+				Message: "Invalid credentials",
+			})
+			return
+		}
+
+		writeJSON(w, http.StatusInternalServerError, APIResponse{
+			Message: "Something went wrong, please try again later",
 		})
 		return
 	}

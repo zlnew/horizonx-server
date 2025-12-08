@@ -23,7 +23,16 @@ func NewService(repo UserRepository, secret string, expiry time.Duration) AuthSe
 	}
 }
 
+var (
+	ErrEmailAlreadyExists = errors.New("email already exists")
+	ErrInvalidCredentials = errors.New("invalid credentials")
+)
+
 func (s *service) Register(ctx context.Context, req RegisterRequest) error {
+	if user, _ := s.repo.GetUserByEmail(ctx, req.Email); user != nil {
+		return ErrEmailAlreadyExists
+	}
+
 	hashedPwd, err := bcrypt.GenerateFromPassword([]byte(req.Password), bcrypt.DefaultCost)
 	if err != nil {
 		return err
@@ -40,12 +49,12 @@ func (s *service) Register(ctx context.Context, req RegisterRequest) error {
 func (s *service) Login(ctx context.Context, req LoginRequest) (*AuthResponse, error) {
 	user, err := s.repo.GetUserByEmail(ctx, req.Email)
 	if err != nil {
-		return nil, errors.New("invalid email or password")
+		return nil, ErrInvalidCredentials
 	}
 
 	err = bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(req.Password))
 	if err != nil {
-		return nil, errors.New("invalid email or password")
+		return nil, ErrInvalidCredentials
 	}
 
 	claims := jwt.MapClaims{
