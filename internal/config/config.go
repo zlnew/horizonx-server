@@ -11,10 +11,11 @@ import (
 
 type Config struct {
 	Address        string
+	AllowedOrigins []string
 	Interval       time.Duration
 	LogLevel       string
 	LogFormat      string
-	AllowedOrigins []string
+	JWTSecret      string
 }
 
 func Load() *Config {
@@ -23,6 +24,17 @@ func Load() *Config {
 	addr := os.Getenv("HTTP_ADDR")
 	if addr == "" {
 		addr = ":3000"
+	}
+
+	var origins []string
+	rawOrigins := os.Getenv("ALLOWED_ORIGINS")
+	if rawOrigins != "" {
+		for o := range strings.SplitSeq(rawOrigins, ",") {
+			o = strings.TrimSpace(o)
+			if o != "" {
+				origins = append(origins, o)
+			}
+		}
 	}
 
 	interval := 3 * time.Second
@@ -42,22 +54,14 @@ func Load() *Config {
 		logFormat = "text"
 	}
 
-	var origins []string
-	rawOrigins := os.Getenv("ALLOWED_ORIGINS")
-	if rawOrigins != "" {
-		for o := range strings.SplitSeq(rawOrigins, ",") {
-			o = strings.TrimSpace(o)
-			if o != "" {
-				origins = append(origins, o)
-			}
-		}
-	}
+	jwtSecret := os.Getenv("JWT_SECRET")
 
 	return &Config{
 		Address:        addr,
+		AllowedOrigins: origins,
 		Interval:       interval,
 		LogLevel:       logLevel,
 		LogFormat:      logFormat,
-		AllowedOrigins: origins,
+		JWTSecret:      jwtSecret,
 	}
 }

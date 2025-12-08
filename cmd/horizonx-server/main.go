@@ -13,7 +13,7 @@ import (
 	"horizonx-server/internal/core"
 	"horizonx-server/internal/core/metrics"
 	"horizonx-server/internal/logger"
-	"horizonx-server/internal/store"
+	"horizonx-server/internal/storage/snapshot"
 	"horizonx-server/internal/transport/websocket"
 	"horizonx-server/pkg/types"
 )
@@ -25,18 +25,18 @@ func main() {
 	cfg := config.Load()
 	log := logger.New(cfg)
 
-	store := store.NewSnapshotStore()
+	ms := snapshot.NewMetricsStore()
 	hub := websocket.NewHub(log)
 	sampler := metrics.NewSampler(log)
 
 	sched := core.NewScheduler(cfg.Interval, log, sampler.Collect, func(m types.Metrics) {
-		store.Set(m)
-		hub.BroadcastMetrics(m)
+		ms.Set(m)
+		hub.Emit("metrics", "metrics.updated", m)
 	})
 	go sched.Start(ctx)
 	go hub.Run()
 
-	router := rest.NewRouter(cfg, store, hub, log)
+	router := rest.NewRouter(cfg, ms, hub, log)
 	srv := &http.Server{
 		Addr:    cfg.Address,
 		Handler: router,
