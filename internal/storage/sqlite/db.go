@@ -12,7 +12,7 @@ import (
 )
 
 func NewSqliteDB(dbPath string, log logger.Logger) (*sql.DB, error) {
-	dsn := fmt.Sprintf("file:%s?_busy_timeout=5000&_journal_mode=WAL&_foreign_keys=on", dbPath)
+	dsn := fmt.Sprintf("file:%s?_busy_timeout=5000&_journal_mode=WAL&_foreign_keys=on&_synchronous=NORMAL", dbPath)
 
 	db, err := sql.Open("sqlite3", dsn)
 	if err != nil {
@@ -39,7 +39,7 @@ func NewSqliteDB(dbPath string, log logger.Logger) (*sql.DB, error) {
 func runMigration(db *sql.DB) error {
 	query := `
 	CREATE TABLE IF NOT EXISTS users (
-		id INTEGER PRIMARY KEY AUTOINCREMENT,
+		id INTEGER PRIMARY KEY,
 		email TEXT NOT NULL UNIQUE,
 		password TEXT NOT NULL
 	);

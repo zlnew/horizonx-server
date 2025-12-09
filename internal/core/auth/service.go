@@ -5,17 +5,18 @@ import (
 	"time"
 
 	"horizonx-server/internal/config"
+	"horizonx-server/internal/domain"
 
 	"github.com/golang-jwt/jwt/v5"
 	"golang.org/x/crypto/bcrypt"
 )
 
 type service struct {
-	repo UserRepository
+	repo domain.UserRepository
 	cfg  *config.Config
 }
 
-func NewService(repo UserRepository, cfg *config.Config) AuthService {
+func NewService(repo domain.UserRepository, cfg *config.Config) AuthService {
 	return &service{
 		repo: repo,
 		cfg:  cfg,
@@ -24,7 +25,7 @@ func NewService(repo UserRepository, cfg *config.Config) AuthService {
 
 func (s *service) Register(ctx context.Context, req RegisterRequest) error {
 	if user, _ := s.repo.GetUserByEmail(ctx, req.Email); user != nil {
-		return ErrEmailAlreadyExists
+		return domain.ErrEmailAlreadyExists
 	}
 
 	hashedPwd, err := bcrypt.GenerateFromPassword([]byte(req.Password), bcrypt.DefaultCost)
@@ -32,7 +33,7 @@ func (s *service) Register(ctx context.Context, req RegisterRequest) error {
 		return err
 	}
 
-	user := &User{
+	user := &domain.User{
 		Email:    req.Email,
 		Password: string(hashedPwd),
 	}
@@ -43,12 +44,12 @@ func (s *service) Register(ctx context.Context, req RegisterRequest) error {
 func (s *service) Login(ctx context.Context, req LoginRequest) (*AuthResponse, error) {
 	user, err := s.repo.GetUserByEmail(ctx, req.Email)
 	if err != nil {
-		return nil, ErrInvalidCredentials
+		return nil, domain.ErrInvalidCredentials
 	}
 
 	err = bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(req.Password))
 	if err != nil {
-		return nil, ErrInvalidCredentials
+		return nil, domain.ErrInvalidCredentials
 	}
 
 	claims := jwt.MapClaims{

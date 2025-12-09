@@ -3,19 +3,9 @@ package auth
 
 import (
 	"context"
-	"errors"
-)
 
-var (
-	ErrEmailAlreadyExists = errors.New("email already exists")
-	ErrInvalidCredentials = errors.New("invalid credentials")
+	"horizonx-server/internal/domain"
 )
-
-type User struct {
-	ID       int64  `json:"id"`
-	Email    string `json:"email"`
-	Password string `json:"-"`
-}
 
 type LoginRequest struct {
 	Email    string `json:"email"`
@@ -28,13 +18,8 @@ type RegisterRequest struct {
 }
 
 type AuthResponse struct {
-	User        *User  `json:"user"`
-	AccessToken string `json:"access_token"`
-}
-
-type UserRepository interface {
-	CreateUser(ctx context.Context, user *User) error
-	GetUserByEmail(ctx context.Context, email string) (*User, error)
+	User        *domain.User `json:"user"`
+	AccessToken string       `json:"access_token"`
 }
 
 type AuthService interface {

@@ -12,6 +12,7 @@ import (
 	"horizonx-server/internal/core"
 	"horizonx-server/internal/core/auth"
 	"horizonx-server/internal/core/metrics"
+	"horizonx-server/internal/core/user"
 	"horizonx-server/internal/logger"
 	"horizonx-server/internal/storage/snapshot"
 	"horizonx-server/internal/storage/sqlite"
@@ -50,16 +51,19 @@ func main() {
 	}()
 
 	userRepo := sqlite.NewUserRepository(db)
+	userService := user.NewService(userRepo, cfg)
 	authService := auth.NewService(userRepo, cfg)
 
 	wsHandler := websocket.NewHandler(hub, cfg, log)
-	authHandler := rest.NewAuthHandler(authService, cfg)
 	metricsHandler := rest.NewMetricsHandler(ms)
+	authHandler := rest.NewAuthHandler(authService, cfg)
+	userHandler := rest.NewUserHandler(userService, cfg)
 
 	router := rest.NewRouter(cfg, &rest.RouterDeps{
 		WS:      wsHandler,
-		Auth:    authHandler,
 		Metrics: metricsHandler,
+		Auth:    authHandler,
+		User:    userHandler,
 	})
 
 	srv := rest.NewServer(router, cfg.Address)

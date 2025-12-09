@@ -11,8 +11,9 @@ import (
 
 type RouterDeps struct {
 	WS      *websocket.Handler
-	Auth    *AuthHandler
 	Metrics *MetricsHandler
+	Auth    *AuthHandler
+	User    *UserHandler
 }
 
 func NewRouter(cfg *config.Config, deps *RouterDeps) http.Handler {
@@ -29,12 +30,18 @@ func NewRouter(cfg *config.Config, deps *RouterDeps) http.Handler {
 		w.Write([]byte("OK"))
 	})
 
+	mux.HandleFunc("GET /ws", deps.WS.Serve)
+
+	mux.Handle("GET /metrics", authMw.Then(http.HandlerFunc(deps.Metrics.Get)))
+
 	mux.HandleFunc("POST /auth/register", deps.Auth.Register)
 	mux.HandleFunc("POST /auth/login", deps.Auth.Login)
-	mux.HandleFunc("POST /auth/logout", deps.Auth.Logout)
+	mux.Handle("POST /auth/logout", authMw.Then(http.HandlerFunc(deps.Auth.Logout)))
 
-	mux.HandleFunc("/ws", deps.WS.Serve)
-	mux.Handle("GET /metrics", authMw.Then(http.HandlerFunc(deps.Metrics.Get)))
+	mux.Handle("GET /users", authMw.Then(http.HandlerFunc(deps.User.Index)))
+	mux.Handle("POST /users", authMw.Then(http.HandlerFunc(deps.User.Store)))
+	mux.Handle("PUT /users/{id}", authMw.Then(http.HandlerFunc(deps.User.Update)))
+	mux.Handle("DELETE /users/{id}", authMw.Then(http.HandlerFunc(deps.User.Destroy)))
 
 	// Placeholder for new feature routes
 	// mux.HandleFunc("/ssh", handler.HandleSSH)
