@@ -57,6 +57,11 @@ func (h *UserHandler) Store(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if validationErrors := ValidateStruct(req); len(validationErrors) > 0 {
+		JSONValidationError(w, validationErrors)
+		return
+	}
+
 	if err := h.svc.Create(r.Context(), req); err != nil {
 		if errors.Is(err, domain.ErrEmailAlreadyExists) {
 			JSONError(w, http.StatusBadRequest, "Email already registered")
@@ -78,6 +83,11 @@ func (h *UserHandler) Update(w http.ResponseWriter, r *http.Request) {
 	var req domain.UserSaveRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		JSONError(w, http.StatusBadRequest, "Invalid request body")
+		return
+	}
+
+	if validationErrors := ValidateStruct(req); len(validationErrors) > 0 {
+		JSONValidationError(w, validationErrors)
 		return
 	}
 

@@ -18,8 +18,8 @@ type User struct {
 }
 
 type UserSaveRequest struct {
-	Email    string `json:"email"`
-	Password string `json:"password"`
+	Email    string `json:"email" validate:"required,email"`
+	Password string `json:"password" validate:"omitempty,min=8"`
 }
 
 type UserRepository interface {

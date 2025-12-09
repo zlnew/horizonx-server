@@ -2,7 +2,9 @@ package rest
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
+	"sort"
 )
 
 type APIResponse struct {
@@ -33,8 +35,36 @@ func JSONError(w http.ResponseWriter, status int, message string) {
 }
 
 func JSONValidationError(w http.ResponseWriter, errors map[string]string) {
+	if len(errors) == 0 {
+		writeJSON(w, http.StatusUnprocessableEntity, APIResponse{
+			Message: "The given data was invalid.",
+			Errors:  nil,
+		})
+		return
+	}
+
+	keys := make([]string, 0, len(errors))
+	for k := range errors {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+
+	firstField := keys[0]
+	mainMessage := errors[firstField]
+
+	remaining := len(errors) - 1
+
+	var finalMessage string
+	if remaining == 0 {
+		finalMessage = mainMessage
+	} else if remaining == 1 {
+		finalMessage = fmt.Sprintf("%s (and 1 more error)", mainMessage)
+	} else {
+		finalMessage = fmt.Sprintf("%s (and %d more errors)", mainMessage, remaining)
+	}
+
 	writeJSON(w, http.StatusUnprocessableEntity, APIResponse{
-		Message: "The given data was invalid.",
+		Message: finalMessage,
 		Errors:  errors,
 	})
 }

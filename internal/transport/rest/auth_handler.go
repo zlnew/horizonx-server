@@ -29,6 +29,11 @@ func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if validationErrors := ValidateStruct(req); len(validationErrors) > 0 {
+		JSONValidationError(w, validationErrors)
+		return
+	}
+
 	if err := h.svc.Register(r.Context(), req); err != nil {
 		if errors.Is(err, domain.ErrEmailAlreadyExists) {
 			JSONError(w, http.StatusConflict, "Email already registered")
@@ -48,6 +53,11 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 	var req domain.LoginRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		JSONError(w, http.StatusBadRequest, "Invalid request body")
+		return
+	}
+
+	if validationErrors := ValidateStruct(req); len(validationErrors) > 0 {
+		JSONValidationError(w, validationErrors)
 		return
 	}
 

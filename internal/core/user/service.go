@@ -74,20 +74,30 @@ func (s *service) Update(ctx context.Context, req domain.UserSaveRequest, userID
 		return err
 	}
 
-	if user, _ := s.repo.GetUserByEmail(ctx, req.Email); user != nil {
-		if user.ID != parsedUserID {
-			return domain.ErrEmailAlreadyExists
-		}
-	}
-
-	hashedPwd, err := bcrypt.GenerateFromPassword([]byte(req.Password), bcrypt.DefaultCost)
+	existingUser, err := s.repo.GetUserByID(ctx, parsedUserID)
 	if err != nil {
 		return err
 	}
 
+	if req.Email != existingUser.Email {
+		if userCheck, _ := s.repo.GetUserByEmail(ctx, req.Email); userCheck != nil {
+			return domain.ErrEmailAlreadyExists
+		}
+	}
+
+	passwordToSave := existingUser.Password
+
+	if req.Password != "" {
+		hashedPwd, err := bcrypt.GenerateFromPassword([]byte(req.Password), bcrypt.DefaultCost)
+		if err != nil {
+			return err
+		}
+		passwordToSave = string(hashedPwd)
+	}
+
 	user := &domain.User{
 		Email:    req.Email,
-		Password: string(hashedPwd),
+		Password: passwordToSave,
 	}
 
 	return s.repo.UpdateUser(ctx, user, parsedUserID)
