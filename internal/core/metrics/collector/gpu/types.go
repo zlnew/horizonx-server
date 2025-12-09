@@ -1,9 +1,9 @@
 package gpu
 
 import (
+	"horizonx-server/internal/domain"
 	"horizonx-server/internal/logger"
 	"horizonx-server/pkg"
-	"horizonx-server/pkg/types"
 )
 
 type Collector struct {
@@ -13,4 +13,4 @@ type Collector struct {
 	fanSpeedEMA map[string]*pkg.EMA
 }
 
-type GPUMetric = types.GPUMetric
+type GPUMetric = domain.GPUMetric

@@ -3,9 +3,9 @@ package network
 import (
 	"time"
 
+	"horizonx-server/internal/domain"
 	"horizonx-server/internal/logger"
 	"horizonx-server/pkg"
-	"horizonx-server/pkg/types"
 )
 
 type Collector struct {
@@ -17,4 +17,4 @@ type Collector struct {
 	txSpeedEMA  *pkg.EMA
 }
 
-type NetworkMetric = types.NetworkMetric
+type NetworkMetric = domain.NetworkMetric

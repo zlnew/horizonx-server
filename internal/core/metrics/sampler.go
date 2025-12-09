@@ -11,8 +11,8 @@ import (
 	"horizonx-server/internal/core/metrics/collector/network"
 	"horizonx-server/internal/core/metrics/collector/os"
 	"horizonx-server/internal/core/metrics/collector/uptime"
+	"horizonx-server/internal/domain"
 	"horizonx-server/internal/logger"
-	"horizonx-server/pkg/types"
 )
 
 type Sampler struct {
@@ -39,8 +39,8 @@ func NewSampler(log logger.Logger) *Sampler {
 	}
 }
 
-func (s *Sampler) Collect(ctx context.Context) types.Metrics {
-	var metrics types.Metrics
+func (s *Sampler) Collect(ctx context.Context) domain.Metrics {
+	var metrics domain.Metrics
 
 	if val, err := s.os.Collect(ctx); err != nil {
 		s.log.Error("collector", "name", "os", "error", err)

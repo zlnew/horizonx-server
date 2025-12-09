@@ -1,8 +1,8 @@
 package memory
 
 import (
+	"horizonx-server/internal/domain"
 	"horizonx-server/internal/logger"
-	"horizonx-server/pkg/types"
 )
 
 type Collector struct {
@@ -13,4 +13,4 @@ type Collector struct {
 	swapFree     uint64
 }
 
-type MemoryMetric = types.MemoryMetric
+type MemoryMetric = domain.MemoryMetric

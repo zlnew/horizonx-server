@@ -5,18 +5,18 @@ import (
 	"context"
 	"time"
 
+	"horizonx-server/internal/domain"
 	"horizonx-server/internal/logger"
-	"horizonx-server/pkg/types"
 )
 
 type Scheduler struct {
 	interval time.Duration
 	log      logger.Logger
-	sample   func(context.Context) types.Metrics
-	sink     func(types.Metrics)
+	sample   func(context.Context) domain.Metrics
+	sink     func(domain.Metrics)
 }
 
-func NewScheduler(interval time.Duration, log logger.Logger, sample func(context.Context) types.Metrics, sink func(types.Metrics)) *Scheduler {
+func NewScheduler(interval time.Duration, log logger.Logger, sample func(context.Context) domain.Metrics, sink func(domain.Metrics)) *Scheduler {
 	return &Scheduler{interval: interval, log: log, sample: sample, sink: sink}
 }
 

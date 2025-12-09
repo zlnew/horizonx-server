@@ -13,12 +13,12 @@ import (
 	"horizonx-server/internal/core/auth"
 	"horizonx-server/internal/core/metrics"
 	"horizonx-server/internal/core/user"
+	"horizonx-server/internal/domain"
 	"horizonx-server/internal/logger"
 	"horizonx-server/internal/storage/snapshot"
 	"horizonx-server/internal/storage/sqlite"
 	"horizonx-server/internal/transport/rest"
 	"horizonx-server/internal/transport/websocket"
-	"horizonx-server/pkg/types"
 )
 
 func main() {
@@ -32,7 +32,7 @@ func main() {
 	hub := websocket.NewHub(log)
 	sampler := metrics.NewSampler(log)
 
-	sched := core.NewScheduler(cfg.Interval, log, sampler.Collect, func(m types.Metrics) {
+	sched := core.NewScheduler(cfg.Interval, log, sampler.Collect, func(m domain.Metrics) {
 		ms.Set(m)
 		hub.Emit("metrics", "metrics.updated", m)
 	})

@@ -1,9 +1,9 @@
 package snapshot
 
-import "horizonx-server/pkg/types"
+import "horizonx-server/internal/domain"
 
 type MetricsStore struct {
-	Store[types.Metrics]
+	Store[domain.Metrics]
 }
 
 func NewMetricsStore() *MetricsStore {

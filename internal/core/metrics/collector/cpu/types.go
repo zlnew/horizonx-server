@@ -3,9 +3,9 @@ package cpu
 import (
 	"time"
 
+	"horizonx-server/internal/domain"
 	"horizonx-server/internal/logger"
 	"horizonx-server/pkg"
-	"horizonx-server/pkg/types"
 )
 
 type Collector struct {
@@ -23,4 +23,4 @@ type cpuStat struct {
 	idle  uint64
 }
 
-type CPUMetric = types.CPUMetric
+type CPUMetric = domain.CPUMetric
