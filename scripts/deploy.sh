@@ -58,7 +58,7 @@ sudo cp $BIN_SRC/migrate $INSTALL_DIR/$MIGRATE_TOOL
 sudo cp $BIN_SRC/seed $INSTALL_DIR/$SEED_TOOL
 sudo chmod +x $INSTALL_DIR/*
 
-# 6. Deploy Configs (THE CRITICAL PART)
+# 6. Deploy Configs
 echo "📄 Deploying Separate Configurations..."
 
 # A. Server Config
@@ -82,7 +82,7 @@ else
     echo "⚠️  WARNING: $ENV_AGENT_SRC not found! Agent service might fail."
 fi
 
-# 7. Run Migrations (Pake Server Env)
+# 7. Run Migrations
 echo "📦 Running Database Migrations..."
 sudo sh -c "set -a; source $CONFIG_DIR/server.env; set +a; $INSTALL_DIR/$MIGRATE_TOOL -op=up"
 
@@ -143,3 +143,10 @@ sudo systemctl start $SERVER_SERVICE
 sudo systemctl start $AGENT_SERVICE
 
 echo "✅ Deployment Success! Configurations are isolated."
+echo ""
+echo "---------------------------------------------------------"
+echo "🌱  HINT: FIRST TIME DEPLOY?"
+echo "    If you need to seed the database, run this command manually:"
+echo ""
+echo "    sudo sh -c \"set -a; source $CONFIG_DIR/server.env; set +a; $INSTALL_DIR/$SEED_TOOL\""
+echo "---------------------------------------------------------"
