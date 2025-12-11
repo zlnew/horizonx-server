@@ -150,7 +150,7 @@ func (h *Hub) Run() {
 					}
 				}
 			} else {
-				h.log.Warn("ws: no room found for channel, event not broadcasted", "channel", evt.Channel)
+				h.log.Debug("ws: no room found for channel, event not broadcasted", "channel", evt.Channel)
 			}
 
 		case cmd := <-h.commands:
