@@ -74,7 +74,7 @@ func (h *Hub) Run() {
 				close(client.send)
 				h.log.Info("ws: client unregistered", "id", client.ID, "type", client.Type, "total_clients", len(h.clients))
 
-				if client.Type == domain.WsClientUser {
+				if client.Type == domain.WsClientAgent {
 					if _, agentOk := h.agents[client.ID]; agentOk {
 						delete(h.agents, client.ID)
 						go h.updateAgentServerStatus(client.ID, false)
