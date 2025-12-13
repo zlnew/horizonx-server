@@ -84,7 +84,7 @@ func (h *Hub) Run() {
 				h.agents[client.ID] = client
 				h.SendCommand(&domain.WsAgentCommand{
 					TargetServerID: client.ID,
-					CommandType:    "init",
+					CommandType:    domain.WsCommandInit,
 				})
 
 				h.log.Info("ws: agent registered", "server_id", client.ID, "total_agents", len(h.agents))

@@ -98,7 +98,7 @@ func (h *Hub) handleCommand(cmd *domain.WsAgentCommand) {
 	h.log.Info("executing command", "type", cmd.CommandType)
 
 	switch cmd.CommandType {
-	case "init":
+	case domain.WsCommandInit:
 		serverID, err := strconv.ParseInt(cmd.TargetServerID, 10, 64)
 		if err != nil {
 			h.log.Error("failed to parse server id to int64", "target", cmd.TargetServerID, "error", err)

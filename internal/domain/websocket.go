@@ -23,6 +23,10 @@ const (
 )
 
 const (
+	WsCommandInit = "init"
+)
+
+const (
 	WsAgentReport = "agent_report"
 	WsSubscribe   = "subscribe"
 	WsUnsubscribe = "unsubscribe"
