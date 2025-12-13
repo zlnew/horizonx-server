@@ -119,8 +119,6 @@ func (a *Agent) start(ctx context.Context) error {
 	a.conn = conn
 	a.log.Info("ws connected to server", "url", a.serverURL)
 
-	go a.forwardHubEvents(ctx)
-
 	sessionCtx, cancel := context.WithCancel(ctx)
 	pumpDone := make(chan error, 1)
 
@@ -128,8 +126,20 @@ func (a *Agent) start(ctx context.Context) error {
 		cancel()
 		a.conn.Close()
 		a.serverID = 0
+
+		for {
+			select {
+			case <-a.internalEvents:
+			default:
+				goto cleanupDone
+			}
+		}
+
+	cleanupDone:
 		a.log.Info("ws connection closed and resources cleaned up")
 	}()
+
+	go a.forwardHubEvents(sessionCtx)
 
 	go func() { pumpDone <- a.readPump(sessionCtx) }()
 	go func() { pumpDone <- a.writePump(sessionCtx) }()
@@ -207,7 +217,7 @@ func (a *Agent) start(ctx context.Context) error {
 	return finalErr
 }
 
-func (a *Agent) forwardHubEvents(ctx context.Context) {
+func (a *Agent) forwardHubEvents(sessionCtx context.Context) {
 	if a.hub == nil {
 		return
 	}
@@ -220,7 +230,7 @@ func (a *Agent) forwardHubEvents(ctx context.Context) {
 			default:
 				a.log.Warn("internal events buffer full, dropping event", "event", ev.Event)
 			}
-		case <-ctx.Done():
+		case <-sessionCtx.Done():
 			return
 		}
 	}

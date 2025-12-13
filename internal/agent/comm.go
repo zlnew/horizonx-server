@@ -41,7 +41,11 @@ func (a *Agent) readPump(ctx context.Context) error {
 				continue
 			}
 
-			a.hub.commands <- &command
+			select {
+			case a.hub.commands <- &command:
+			case <-ctx.Done():
+				return ctx.Err()
+			}
 		}
 	}
 }
