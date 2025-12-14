@@ -3,16 +3,14 @@ package ws
 import (
 	"context"
 	"encoding/json"
+	"math"
+	"time"
 
 	"horizonx-server/internal/domain"
 	"horizonx-server/internal/logger"
 
 	"github.com/google/uuid"
 )
-
-type AgentHubDeps struct {
-	Job *domain.JobService
-}
 
 type AgentHub struct {
 	ctx    context.Context
@@ -24,26 +22,20 @@ type AgentHub struct {
 	unregister chan *Agent
 	commands   chan *domain.WsAgentCommand
 
-	log  logger.Logger
-	deps *AgentHubDeps
+	log logger.Logger
 }
 
-func NewAgentHub(parent context.Context, log logger.Logger, deps *AgentHubDeps) *AgentHub {
+func NewAgentHub(parent context.Context, log logger.Logger) *AgentHub {
 	ctx, cancel := context.WithCancel(parent)
 
 	return &AgentHub{
-		ctx:    ctx,
-		cancel: cancel,
-
-		agents: make(map[uuid.UUID]*Agent),
-
+		ctx:        ctx,
+		cancel:     cancel,
+		agents:     make(map[uuid.UUID]*Agent),
 		register:   make(chan *Agent, 64),
 		unregister: make(chan *Agent, 64),
-
-		commands: make(chan *domain.WsAgentCommand, 256),
-
-		log:  log,
-		deps: deps,
+		commands:   make(chan *domain.WsAgentCommand, 1024),
+		log:        log,
 	}
 }
 
@@ -81,19 +73,29 @@ func (h *AgentHub) Stop() {
 	h.cancel()
 }
 
-func (h *AgentHub) SendCommand(cmd *domain.WsAgentCommand) {
-	select {
-	case h.commands <- cmd:
-	case <-h.ctx.Done():
-	default:
-		h.log.Warn("ws: command buffer full, dropping command")
-	}
+func (h *AgentHub) SendCommand(cmd *domain.WsAgentCommand, retryCfg domain.JobRetryConfig) {
+	go func() {
+		for attempt := 0; attempt < retryCfg.MaxAttempts; attempt++ {
+			select {
+			case h.commands <- cmd:
+				return
+			case <-h.ctx.Done():
+				h.log.Warn("ws: hub stopped, abort send command", "command", cmd.CommandType)
+				return
+			default:
+				delay := retryCfg.BaseDelay * time.Duration(math.Pow(2, float64(attempt)))
+				h.log.Warn("ws: command buffer full, retrying", "command", cmd.CommandType, "attempt", attempt+1, "delay_ms", delay.Milliseconds())
+				time.Sleep(delay)
+			}
+		}
+		h.log.Error("ws: command dropped after retries", "command", cmd.CommandType)
+	}()
 }
 
 func (h *AgentHub) handleCommand(cmd *domain.WsAgentCommand) {
 	agent, ok := h.agents[cmd.TargetServerID]
 	if !ok {
-		h.log.Warn("ws: target agent not connected", "target_id", cmd.TargetServerID)
+		h.log.Warn("ws: target agent not connected", "server_id", cmd.TargetServerID)
 		return
 	}
 
@@ -105,9 +107,9 @@ func (h *AgentHub) handleCommand(cmd *domain.WsAgentCommand) {
 
 	select {
 	case agent.send <- message:
-		h.log.Info("ws: command sent to agent", "agent_id", agent.ID, "command", cmd.CommandType)
+		h.log.Info("ws: command sent to agent", "server_id", agent.ID, "command", cmd.CommandType)
 	default:
-		h.log.Warn("ws: agent channel full, force unregister", "id", agent.ID)
+		h.log.Warn("ws: agent channel full, force unregister", "server_id", agent.ID)
 		h.unregister <- agent
 	}
 }

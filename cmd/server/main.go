@@ -12,6 +12,7 @@ import (
 	"horizonx-server/internal/core/job"
 	"horizonx-server/internal/core/server"
 	"horizonx-server/internal/core/user"
+	"horizonx-server/internal/domain"
 	"horizonx-server/internal/logger"
 	"horizonx-server/internal/storage/postgres"
 	"horizonx-server/internal/transport/rest"
@@ -42,24 +43,37 @@ func main() {
 	serverService := server.NewService(serverRepo)
 	authService := auth.NewService(userRepo, cfg.JWTSecret, cfg.JWTExpiry)
 	userService := user.NewService(userRepo)
-	jobService := job.NewService(jobRepo)
 
 	serverHandler := rest.NewServerHandler(serverService)
 	authHandler := rest.NewAuthHandler(authService, cfg)
 	userHandler := rest.NewUserHandler(userService)
-	jobHandler := rest.NewJobHandler(jobService)
 
 	hub := ws.NewHub(ctx, log)
-	go hub.Run()
 	wsHandler := ws.NewHandler(hub, log, cfg.JWTSecret, cfg.AllowedOrigins)
 
-	agentHub := ws.NewAgentHub(ctx, log, &ws.AgentHubDeps{Job: &jobService})
+	agentHub := ws.NewAgentHub(ctx, log)
+
+	retryCfg := domain.JobRetryConfig{
+		MaxAttempts: 5,
+		BaseDelay:   100 * time.Millisecond,
+	}
+
+	jobService := job.NewService(jobRepo, func(cmd *domain.WsAgentCommand, retryCfg domain.JobRetryConfig) {
+		agentHub.SendCommand(cmd, retryCfg)
+	}, retryCfg)
+
+	jobHandler := rest.NewJobHandler(jobService)
+	wsAgentHandler := ws.NewAgentHandler(agentHub, log, &ws.AgentHandlerDeps{
+		Server: serverService,
+		Job:    jobService,
+	})
+
+	go hub.Run()
 	go agentHub.Run()
-	agentHandler := ws.NewAgentHandler(agentHub, log, serverService)
 
 	router := rest.NewRouter(cfg, &rest.RouterDeps{
 		WsWeb:   wsHandler,
-		WsAgent: agentHandler,
+		WsAgent: wsAgentHandler,
 		Server:  serverHandler,
 		Auth:    authHandler,
 		User:    userHandler,

@@ -1,24 +1,30 @@
 package ws
 
 import (
+	"context"
 	"net/http"
 	"strings"
 
 	"horizonx-server/internal/domain"
 	"horizonx-server/internal/logger"
 
+	"github.com/google/uuid"
 	"github.com/gorilla/websocket"
 )
+
+type AgentHandlerDeps struct {
+	Server domain.ServerService
+	Job    domain.JobService
+}
 
 type AgentHandler struct {
 	hub      *AgentHub
 	upgrader websocket.Upgrader
 	log      logger.Logger
-
-	svc domain.ServerService
+	deps     *AgentHandlerDeps
 }
 
-func NewAgentHandler(hub *AgentHub, log logger.Logger, svc domain.ServerService) *AgentHandler {
+func NewAgentHandler(hub *AgentHub, log logger.Logger, deps *AgentHandlerDeps) *AgentHandler {
 	upgrader := websocket.Upgrader{
 		CheckOrigin: func(r *http.Request) bool {
 			return true
@@ -29,8 +35,7 @@ func NewAgentHandler(hub *AgentHub, log logger.Logger, svc domain.ServerService)
 		hub:      hub,
 		upgrader: upgrader,
 		log:      log,
-
-		svc: svc,
+		deps:     deps,
 	}
 }
 
@@ -53,7 +58,7 @@ func (h *AgentHandler) Serve(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if _, err := h.svc.AuthorizeAgent(r.Context(), serverID, secret); err != nil {
+	if _, err := h.deps.Server.AuthorizeAgent(r.Context(), serverID, secret); err != nil {
 		h.log.Warn("ws auth: invalid agent credentials")
 		http.Error(w, "invalid credentials", http.StatusUnauthorized)
 		return
@@ -70,4 +75,15 @@ func (h *AgentHandler) Serve(w http.ResponseWriter, r *http.Request) {
 
 	go a.writePump()
 	go a.readPump()
+
+	go func(sID uuid.UUID) {
+		h.initAgent(a.hub.ctx, sID)
+	}(serverID)
+}
+
+func (h *AgentHandler) initAgent(ctx context.Context, serverID uuid.UUID) {
+	_, err := h.deps.Job.InitAgent(ctx, serverID)
+	if err != nil {
+		h.log.Error("failed to init job for agent", "server_id", serverID.String(), "error", err)
+	}
 }

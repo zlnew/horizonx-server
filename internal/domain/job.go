@@ -16,7 +16,7 @@ var (
 type Job struct {
 	ID             int64     `json:"id"`
 	ServerID       uuid.UUID `json:"server_id"`
-	ApplicationID  int64     `json:"application_id"`
+	ApplicationID  *int64    `json:"application_id"`
 	JobType        string    `json:"job_type"`
 	CommandPayload any       `json:"command_payload"`
 	Status         string    `json:"status"`
@@ -35,9 +35,18 @@ const (
 	JobFailed  JobStatus = "failed"
 )
 
+type JobCommandPayload struct {
+	JobID int64
+}
+
 type JobFinishRequest struct {
 	Status    JobStatus `json:"status" validate:"required"`
 	OutputLog string    `json:"output_log" validate:"required"`
+}
+
+type JobRetryConfig struct {
+	MaxAttempts int
+	BaseDelay   time.Duration
 }
 
 type JobRepository interface {
@@ -55,4 +64,6 @@ type JobService interface {
 	Delete(ctx context.Context, jobID int64) error
 	Start(ctx context.Context, jobID int64) (*Job, error)
 	Finish(ctx context.Context, jobID int64, status JobStatus, outputLog *string) (*Job, error)
+
+	InitAgent(ctx context.Context, serverID uuid.UUID) (*Job, error)
 }

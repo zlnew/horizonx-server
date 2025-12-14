@@ -155,9 +155,9 @@ func (a *Agent) readPump(ctx context.Context) error {
 				return err
 			}
 
-			var event domain.WsServerEvent
-			if err := json.Unmarshal(message, &event); err != nil {
-				a.log.Error("invalid event payload received", "error", err)
+			var cmd domain.WsAgentCommand
+			if err := json.Unmarshal(message, &cmd); err != nil {
+				a.log.Error("invalid command payload received", "error", err)
 				continue
 			}
 
@@ -165,6 +165,11 @@ func (a *Agent) readPump(ctx context.Context) error {
 			case <-ctx.Done():
 				return ctx.Err()
 			default:
+				a.log.Info("incoming server command",
+					"target_server_id", cmd.TargetServerID.String(),
+					"command_type", cmd.CommandType,
+					"payload", cmd.Payload,
+				)
 			}
 		}
 	}

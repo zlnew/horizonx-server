@@ -25,7 +25,7 @@ const (
 )
 
 const (
-	WsCommandInit = "init"
+	WsCommandAgentInit = "agent_init"
 )
 
 const (
