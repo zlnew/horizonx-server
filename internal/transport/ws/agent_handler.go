@@ -11,14 +11,14 @@ import (
 )
 
 type AgentHandler struct {
-	hub      *Hub
+	hub      *AgentHub
 	upgrader websocket.Upgrader
 	log      logger.Logger
 
-	serverService domain.ServerService
+	svc domain.ServerService
 }
 
-func NewAgentHandler(hub *Hub, log logger.Logger, serverService domain.ServerService) *AgentHandler {
+func NewAgentHandler(hub *AgentHub, log logger.Logger, svc domain.ServerService) *AgentHandler {
 	upgrader := websocket.Upgrader{
 		CheckOrigin: func(r *http.Request) bool {
 			return true
@@ -30,14 +30,11 @@ func NewAgentHandler(hub *Hub, log logger.Logger, serverService domain.ServerSer
 		upgrader: upgrader,
 		log:      log,
 
-		serverService: serverService,
+		svc: svc,
 	}
 }
 
 func (h *AgentHandler) Serve(w http.ResponseWriter, r *http.Request) {
-	var clientID string
-	var clientType string
-
 	auth := r.Header.Get("Authorization")
 	if auth == "" {
 		http.Error(w, "missing authorization header", http.StatusUnauthorized)
@@ -56,17 +53,7 @@ func (h *AgentHandler) Serve(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	server, err := h.serverService.AuthorizeAgent(r.Context(), serverID, secret)
-	if err != nil {
-		h.log.Warn("ws auth: invalid credentials")
-		http.Error(w, "invalid credentials", http.StatusUnauthorized)
-		return
-	}
-
-	clientID = server.ID.String()
-	clientType = domain.WsClientAgent
-
-	if clientID == "" {
+	if _, err := h.svc.AuthorizeAgent(r.Context(), serverID, secret); err != nil {
 		h.log.Warn("ws auth: invalid credentials")
 		http.Error(w, "invalid credentials", http.StatusUnauthorized)
 		return
@@ -78,9 +65,9 @@ func (h *AgentHandler) Serve(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	c := NewClient(h.hub, conn, h.log, clientID, clientType)
-	c.hub.register <- c
+	a := NewAgent(h.hub, conn, h.log, serverID)
+	a.hub.register <- a
 
-	go c.writePump()
-	go c.readPump()
+	go a.writePump()
+	go a.readPump()
 }

@@ -61,7 +61,7 @@ func (h *Hub) Run() {
 
 		case c := <-h.register:
 			h.clients[c] = true
-			c.log.Info("ws: client registered", "id", c.ID, "type", c.Type)
+			c.log.Info("ws: client registered", "id", c.ID)
 
 		case c := <-h.unregister:
 			if !h.clients[c] {
@@ -70,7 +70,7 @@ func (h *Hub) Run() {
 
 			delete(h.clients, c)
 			close(c.send)
-			h.log.Info("ws: client unregistered", "id", c.ID, "type", c.Type)
+			h.log.Info("ws: client unregistered", "id", c.ID)
 
 			for chID, subs := range h.channels {
 				if _, subsribed := subs[c]; subsribed {

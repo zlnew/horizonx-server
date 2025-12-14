@@ -49,17 +49,17 @@ func main() {
 	userHandler := rest.NewUserHandler(userService)
 	jobHandler := rest.NewJobHandler(jobService)
 
-	wsWebHub := ws.NewHub(ctx, log)
-	go wsWebHub.Run()
-	wsWebHandler := ws.NewWebHandler(wsWebHub, log, cfg.JWTSecret, cfg.AllowedOrigins)
+	hub := ws.NewHub(ctx, log)
+	go hub.Run()
+	wsHandler := ws.NewHandler(hub, log, cfg.JWTSecret, cfg.AllowedOrigins)
 
-	wsAgentHub := ws.NewHub(ctx, log)
-	go wsAgentHub.Run()
-	wsAgentHandler := ws.NewAgentHandler(wsAgentHub, log, serverService)
+	agentHub := ws.NewAgentHub(ctx, log, &ws.AgentHubDeps{Job: &jobService})
+	go agentHub.Run()
+	agentHandler := ws.NewAgentHandler(agentHub, log, serverService)
 
 	router := rest.NewRouter(cfg, &rest.RouterDeps{
-		WsWeb:   wsWebHandler,
-		WsAgent: wsAgentHandler,
+		WsWeb:   wsHandler,
+		WsAgent: agentHandler,
 		Server:  serverHandler,
 		Auth:    authHandler,
 		User:    userHandler,
@@ -79,7 +79,8 @@ func main() {
 
 	select {
 	case <-ctx.Done():
-		wsWebHub.Stop()
+		hub.Stop()
+		agentHub.Stop()
 
 		shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()

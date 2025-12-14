@@ -29,11 +29,10 @@ type Client struct {
 
 	log logger.Logger
 
-	ID   string
-	Type string
+	ID string
 }
 
-func NewClient(hub *Hub, conn *websocket.Conn, log logger.Logger, cID string, cType string) *Client {
+func NewClient(hub *Hub, conn *websocket.Conn, log logger.Logger, cID string) *Client {
 	ctx, cancel := context.WithCancel(hub.ctx)
 
 	return &Client{
@@ -46,8 +45,7 @@ func NewClient(hub *Hub, conn *websocket.Conn, log logger.Logger, cID string, cT
 
 		log: log,
 
-		ID:   cID,
-		Type: cType,
+		ID: cID,
 	}
 }
 

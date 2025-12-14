@@ -11,7 +11,7 @@ import (
 )
 
 type RouterDeps struct {
-	WsWeb   *ws.WebHandler
+	WsWeb   *ws.Handler
 	WsAgent *ws.AgentHandler
 	Server  *ServerHandler
 	Auth    *AuthHandler
