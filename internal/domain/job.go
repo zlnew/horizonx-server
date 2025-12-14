@@ -57,11 +57,6 @@ type JobFinishRequest struct {
 	OutputLog string    `json:"output_log" validate:"required"`
 }
 
-type JobRetryConfig struct {
-	MaxAttempts int
-	BaseDelay   time.Duration
-}
-
 type JobRepository interface {
 	List(ctx context.Context) ([]Job, error)
 	Create(ctx context.Context, j *Job) (*Job, error)

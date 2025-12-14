@@ -63,7 +63,7 @@ func (h *Handler) Serve(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if clientID == "" {
-		h.log.Warn("ws auth: no valid credentials")
+		h.log.Warn("ws auth: invalid credentials")
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
 		return
 	}

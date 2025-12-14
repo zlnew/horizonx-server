@@ -112,7 +112,7 @@ func (h *Hub) Broadcast(ev *domain.WsServerEvent) {
 	case h.events <- ev:
 	case <-h.ctx.Done():
 	default:
-		h.log.Warn("ws: broadcast buffer full, dropping event")
+		h.log.Warn("ws: broadcast buffer full, dropping event", "event", ev.Event)
 	}
 }
 

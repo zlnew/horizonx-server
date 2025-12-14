@@ -3,8 +3,6 @@ package ws
 import (
 	"context"
 	"encoding/json"
-	"math"
-	"time"
 
 	"horizonx-server/internal/domain"
 	"horizonx-server/internal/logger"
@@ -73,23 +71,13 @@ func (h *AgentHub) Stop() {
 	h.cancel()
 }
 
-func (h *AgentHub) SendCommand(cmd *domain.WsAgentCommand, retryCfg domain.JobRetryConfig) {
-	go func() {
-		for attempt := 0; attempt < retryCfg.MaxAttempts; attempt++ {
-			select {
-			case h.commands <- cmd:
-				return
-			case <-h.ctx.Done():
-				h.log.Warn("ws: hub stopped, abort send command", "command", cmd.CommandType)
-				return
-			default:
-				delay := retryCfg.BaseDelay * time.Duration(math.Pow(2, float64(attempt)))
-				h.log.Warn("ws: command buffer full, retrying", "command", cmd.CommandType, "attempt", attempt+1, "delay_ms", delay.Milliseconds())
-				time.Sleep(delay)
-			}
-		}
-		h.log.Error("ws: command dropped after retries", "command", cmd.CommandType)
-	}()
+func (h *AgentHub) SendCommand(cmd *domain.WsAgentCommand) {
+	select {
+	case h.commands <- cmd:
+	case <-h.ctx.Done():
+	default:
+		h.log.Warn("ws: command buffer full, dropping command", "command", cmd.CommandType)
+	}
 }
 
 func (h *AgentHub) handleCommand(cmd *domain.WsAgentCommand) {
