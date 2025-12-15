@@ -4,15 +4,15 @@ package metrics
 import (
 	"context"
 
-	"horizonx-server/internal/core/metrics/collector/cpu"
-	"horizonx-server/internal/core/metrics/collector/disk"
-	"horizonx-server/internal/core/metrics/collector/gpu"
-	"horizonx-server/internal/core/metrics/collector/memory"
-	"horizonx-server/internal/core/metrics/collector/network"
-	"horizonx-server/internal/core/metrics/collector/os"
-	"horizonx-server/internal/core/metrics/collector/uptime"
 	"horizonx-server/internal/domain"
 	"horizonx-server/internal/logger"
+	"horizonx-server/internal/metrics/collector/cpu"
+	"horizonx-server/internal/metrics/collector/disk"
+	"horizonx-server/internal/metrics/collector/gpu"
+	"horizonx-server/internal/metrics/collector/memory"
+	"horizonx-server/internal/metrics/collector/network"
+	"horizonx-server/internal/metrics/collector/os"
+	"horizonx-server/internal/metrics/collector/uptime"
 )
 
 type Sampler struct {

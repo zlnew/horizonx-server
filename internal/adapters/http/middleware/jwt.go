@@ -5,7 +5,7 @@ import (
 	"net/http"
 
 	"horizonx-server/internal/config"
-	"horizonx-server/pkg"
+	"horizonx-server/internal/pkg"
 )
 
 type contextKey string

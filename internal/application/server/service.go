@@ -6,7 +6,7 @@ import (
 
 	"horizonx-server/internal/domain"
 	"horizonx-server/internal/event"
-	"horizonx-server/pkg"
+	"horizonx-server/internal/pkg"
 
 	"github.com/google/uuid"
 	"golang.org/x/crypto/bcrypt"

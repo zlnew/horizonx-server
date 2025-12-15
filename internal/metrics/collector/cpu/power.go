@@ -7,7 +7,7 @@ import (
 	"strings"
 	"time"
 
-	"horizonx-server/pkg"
+	"horizonx-server/internal/pkg"
 )
 
 func (c *Collector) readPowerWatt() float64 {

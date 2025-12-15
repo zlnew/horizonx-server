@@ -5,7 +5,7 @@ import (
 	"context"
 
 	"horizonx-server/internal/logger"
-	"horizonx-server/pkg"
+	"horizonx-server/internal/pkg"
 )
 
 func NewCollector(log logger.Logger) *Collector {

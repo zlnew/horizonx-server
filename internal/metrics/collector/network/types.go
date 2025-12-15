@@ -5,7 +5,7 @@ import (
 
 	"horizonx-server/internal/domain"
 	"horizonx-server/internal/logger"
-	"horizonx-server/pkg"
+	"horizonx-server/internal/pkg"
 )
 
 type Collector struct {

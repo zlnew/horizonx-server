@@ -6,7 +6,7 @@ import (
 	"slices"
 
 	"horizonx-server/internal/logger"
-	"horizonx-server/pkg"
+	"horizonx-server/internal/pkg"
 
 	"github.com/gorilla/websocket"
 )

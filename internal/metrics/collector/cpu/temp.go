@@ -6,7 +6,7 @@ import (
 	"strconv"
 	"strings"
 
-	"horizonx-server/pkg"
+	"horizonx-server/internal/pkg"
 )
 
 func (c *Collector) readTemperature() float64 {
