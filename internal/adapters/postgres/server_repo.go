@@ -56,6 +56,61 @@ func (r *ServerRepository) List(ctx context.Context) ([]domain.Server, error) {
 	return servers, nil
 }
 
+func (r *ServerRepository) GetByID(ctx context.Context, serverID uuid.UUID) (*domain.Server, error) {
+	query := `
+		SELECT id, name, COALESCE(ip_address::text, ''), api_token, is_online, os_info, created_at, updated_at
+		FROM servers
+		WHERE id = $1 AND deleted_at IS NULL LIMIT 1
+	`
+
+	var s domain.Server
+	err := r.db.QueryRow(ctx, query, serverID).Scan(
+		&s.ID,
+		&s.Name,
+		&s.IPAddress,
+		&s.APIToken,
+		&s.IsOnline,
+		&s.OSInfo,
+		&s.CreatedAt,
+		&s.UpdatedAt,
+	)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, domain.ErrServerNotFound
+		}
+		return nil, err
+	}
+
+	return &s, nil
+}
+
+func (r *ServerRepository) GetByToken(ctx context.Context, token string) (*domain.Server, error) {
+	query := `
+		SELECT id, name, COALESCE(ip_address::text, ''), is_online, os_info, created_at, updated_at
+		FROM servers
+		WHERE api_token = $1 AND deleted_at IS NULL LIMIT 1
+	`
+
+	var s domain.Server
+	err := r.db.QueryRow(ctx, query, token).Scan(
+		&s.ID,
+		&s.Name,
+		&s.IPAddress,
+		&s.IsOnline,
+		&s.OSInfo,
+		&s.CreatedAt,
+		&s.UpdatedAt,
+	)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, domain.ErrServerNotFound
+		}
+		return nil, err
+	}
+
+	return &s, nil
+}
+
 func (r *ServerRepository) Create(ctx context.Context, s *domain.Server) (*domain.Server, error) {
 	query := `
 		INSERT INTO servers (name, ip_address, api_token, is_online, created_at, updated_at)
@@ -127,61 +182,6 @@ func (r *ServerRepository) Delete(ctx context.Context, serverID uuid.UUID) error
 	}
 
 	return nil
-}
-
-func (r *ServerRepository) GetByID(ctx context.Context, serverID uuid.UUID) (*domain.Server, error) {
-	query := `
-		SELECT id, name, COALESCE(ip_address::text, ''), api_token, is_online, os_info, created_at, updated_at
-		FROM servers
-		WHERE id = $1 AND deleted_at IS NULL LIMIT 1
-	`
-
-	var s domain.Server
-	err := r.db.QueryRow(ctx, query, serverID).Scan(
-		&s.ID,
-		&s.Name,
-		&s.IPAddress,
-		&s.APIToken,
-		&s.IsOnline,
-		&s.OSInfo,
-		&s.CreatedAt,
-		&s.UpdatedAt,
-	)
-	if err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
-			return nil, domain.ErrServerNotFound
-		}
-		return nil, err
-	}
-
-	return &s, nil
-}
-
-func (r *ServerRepository) GetByToken(ctx context.Context, token string) (*domain.Server, error) {
-	query := `
-		SELECT id, name, COALESCE(ip_address::text, ''), is_online, os_info, created_at, updated_at
-		FROM servers
-		WHERE api_token = $1 AND deleted_at IS NULL LIMIT 1
-	`
-
-	var s domain.Server
-	err := r.db.QueryRow(ctx, query, token).Scan(
-		&s.ID,
-		&s.Name,
-		&s.IPAddress,
-		&s.IsOnline,
-		&s.OSInfo,
-		&s.CreatedAt,
-		&s.UpdatedAt,
-	)
-	if err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
-			return nil, domain.ErrServerNotFound
-		}
-		return nil, err
-	}
-
-	return &s, nil
 }
 
 func (r *ServerRepository) UpdateStatus(ctx context.Context, serverID uuid.UUID, isOnline bool) error {

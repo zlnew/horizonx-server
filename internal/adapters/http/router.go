@@ -15,11 +15,12 @@ type RouterDeps struct {
 	WsUser  *userws.Handler
 	WsAgent *agentws.Handler
 
-	Auth    *AuthHandler
-	Job     *JobHandler
-	Metrics *MetricsHandler
-	Server  *ServerHandler
-	User    *UserHandler
+	Auth        *AuthHandler
+	Job         *JobHandler
+	Metrics     *MetricsHandler
+	Server      *ServerHandler
+	User        *UserHandler
+	Application *ApplicationHandler
 
 	ServerService domain.ServerService
 }
@@ -67,6 +68,30 @@ func NewRouter(cfg *config.Config, deps *RouterDeps) http.Handler {
 	mux.Handle("POST /users", userStack.Then(http.HandlerFunc(deps.User.Store)))
 	mux.Handle("PUT /users/{id}", userStack.Then(http.HandlerFunc(deps.User.Update)))
 	mux.Handle("DELETE /users/{id}", userStack.Then(http.HandlerFunc(deps.User.Destroy)))
+
+	// APPLICATIONS
+	mux.Handle("GET /applications", userStack.Then(http.HandlerFunc(deps.Application.Index)))
+	mux.Handle("GET /applications/{id}", userStack.Then(http.HandlerFunc(deps.Application.Show)))
+	mux.Handle("POST /applications", userStack.Then(http.HandlerFunc(deps.Application.Store)))
+	mux.Handle("PUT /applications/{id}", userStack.Then(http.HandlerFunc(deps.Application.Update)))
+	mux.Handle("DELETE /applications/{id}", userStack.Then(http.HandlerFunc(deps.Application.Destroy)))
+
+	// APPLICATION ACTIONS
+	mux.Handle("POST /applications/{id}/deploy", userStack.Then(http.HandlerFunc(deps.Application.Deploy)))
+	mux.Handle("POST /applications/{id}/start", userStack.Then(http.HandlerFunc(deps.Application.Start)))
+	mux.Handle("POST /applications/{id}/stop", userStack.Then(http.HandlerFunc(deps.Application.Stop)))
+	mux.Handle("POST /applications/{id}/restart", userStack.Then(http.HandlerFunc(deps.Application.Restart)))
+
+	// ENVIRONMENT VARIABLES
+	mux.Handle("GET /applications/{id}/env", userStack.Then(http.HandlerFunc(deps.Application.ListEnvVars)))
+	mux.Handle("POST /applications/{id}/env", userStack.Then(http.HandlerFunc(deps.Application.AddEnvVar)))
+	mux.Handle("PUT /applications/{id}/env/{key}", userStack.Then(http.HandlerFunc(deps.Application.UpdateEnvVar)))
+	mux.Handle("DELETE /applications/{id}/env/{key}", userStack.Then(http.HandlerFunc(deps.Application.DeleteEnvVar)))
+
+	// VOLUMES
+	mux.Handle("GET /applications/{id}/volumes", userStack.Then(http.HandlerFunc(deps.Application.ListVolumes)))
+	mux.Handle("POST /applications/{id}/volumes", userStack.Then(http.HandlerFunc(deps.Application.AddVolume)))
+	mux.Handle("DELETE /applications/{id}/volumes/{volume_id}", userStack.Then(http.HandlerFunc(deps.Application.DeleteVolume)))
 
 	return globalMw.Apply(mux)
 }

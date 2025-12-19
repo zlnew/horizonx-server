@@ -1,0 +1,437 @@
+package http
+
+import (
+	"encoding/json"
+	"errors"
+	"net/http"
+	"strconv"
+
+	"horizonx-server/internal/domain"
+
+	"github.com/google/uuid"
+)
+
+type ApplicationHandler struct {
+	svc domain.ApplicationService
+}
+
+func NewApplicationHandler(svc domain.ApplicationService) *ApplicationHandler {
+	return &ApplicationHandler{svc: svc}
+}
+
+// ============================================================================
+// APPLICATIONS
+// ============================================================================
+
+func (h *ApplicationHandler) Index(w http.ResponseWriter, r *http.Request) {
+	serverIDStr := r.URL.Query().Get("server_id")
+	if serverIDStr == "" {
+		JSONError(w, http.StatusBadRequest, "server_id query parameter is required")
+		return
+	}
+
+	serverID, err := uuid.Parse(serverIDStr)
+	if err != nil {
+		JSONError(w, http.StatusBadRequest, "invalid server_id")
+		return
+	}
+
+	apps, err := h.svc.List(r.Context(), serverID)
+	if err != nil {
+		JSONError(w, http.StatusInternalServerError, "failed to list applications")
+		return
+	}
+
+	JSONSuccess(w, http.StatusOK, APIResponse{
+		Message: "OK",
+		Data:    apps,
+	})
+}
+
+func (h *ApplicationHandler) Show(w http.ResponseWriter, r *http.Request) {
+	appID, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
+	if err != nil {
+		JSONError(w, http.StatusBadRequest, "invalid application id")
+		return
+	}
+
+	app, err := h.svc.GetByID(r.Context(), appID)
+	if err != nil {
+		if errors.Is(err, domain.ErrApplicationNotFound) {
+			JSONError(w, http.StatusNotFound, "application not found")
+			return
+		}
+		JSONError(w, http.StatusInternalServerError, "failed to get application")
+		return
+	}
+
+	JSONSuccess(w, http.StatusOK, APIResponse{
+		Message: "OK",
+		Data:    app,
+	})
+}
+
+func (h *ApplicationHandler) Store(w http.ResponseWriter, r *http.Request) {
+	var req domain.ApplicationCreateRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		JSONError(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+
+	if validationErrors := ValidateStruct(req); len(validationErrors) > 0 {
+		JSONValidationError(w, validationErrors)
+		return
+	}
+
+	app, err := h.svc.Create(r.Context(), req)
+	if err != nil {
+		JSONError(w, http.StatusInternalServerError, "failed to create application")
+		return
+	}
+
+	JSONSuccess(w, http.StatusCreated, APIResponse{
+		Message: "Application created successfully",
+		Data:    app,
+	})
+}
+
+func (h *ApplicationHandler) Update(w http.ResponseWriter, r *http.Request) {
+	appID, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
+	if err != nil {
+		JSONError(w, http.StatusBadRequest, "invalid application id")
+		return
+	}
+
+	var req domain.ApplicationUpdateRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		JSONError(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+
+	if validationErrors := ValidateStruct(req); len(validationErrors) > 0 {
+		JSONValidationError(w, validationErrors)
+		return
+	}
+
+	if err := h.svc.Update(r.Context(), req, appID); err != nil {
+		if errors.Is(err, domain.ErrApplicationNotFound) {
+			JSONError(w, http.StatusNotFound, "application not found")
+			return
+		}
+		JSONError(w, http.StatusInternalServerError, "failed to update application")
+		return
+	}
+
+	JSONSuccess(w, http.StatusOK, APIResponse{
+		Message: "Application updated successfully",
+	})
+}
+
+func (h *ApplicationHandler) Destroy(w http.ResponseWriter, r *http.Request) {
+	appID, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
+	if err != nil {
+		JSONError(w, http.StatusBadRequest, "invalid application id")
+		return
+	}
+
+	if err := h.svc.Delete(r.Context(), appID); err != nil {
+		if errors.Is(err, domain.ErrApplicationNotFound) {
+			JSONError(w, http.StatusNotFound, "application not found")
+			return
+		}
+		JSONError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+
+	JSONSuccess(w, http.StatusOK, APIResponse{
+		Message: "Application deleted successfully",
+	})
+}
+
+// ============================================================================
+// ACTIONS
+// ============================================================================
+
+func (h *ApplicationHandler) Deploy(w http.ResponseWriter, r *http.Request) {
+	appID, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
+	if err != nil {
+		JSONError(w, http.StatusBadRequest, "invalid application id")
+		return
+	}
+
+	if err := h.svc.Deploy(r.Context(), appID); err != nil {
+		if errors.Is(err, domain.ErrApplicationNotFound) {
+			JSONError(w, http.StatusNotFound, "application not found")
+			return
+		}
+		JSONError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	JSONSuccess(w, http.StatusOK, APIResponse{
+		Message: "Deployment started",
+	})
+}
+
+func (h *ApplicationHandler) Start(w http.ResponseWriter, r *http.Request) {
+	appID, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
+	if err != nil {
+		JSONError(w, http.StatusBadRequest, "invalid application id")
+		return
+	}
+
+	if err := h.svc.Start(r.Context(), appID); err != nil {
+		if errors.Is(err, domain.ErrApplicationNotFound) {
+			JSONError(w, http.StatusNotFound, "application not found")
+			return
+		}
+		JSONError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+
+	JSONSuccess(w, http.StatusOK, APIResponse{
+		Message: "Application starting",
+	})
+}
+
+func (h *ApplicationHandler) Stop(w http.ResponseWriter, r *http.Request) {
+	appID, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
+	if err != nil {
+		JSONError(w, http.StatusBadRequest, "invalid application id")
+		return
+	}
+
+	if err := h.svc.Stop(r.Context(), appID); err != nil {
+		if errors.Is(err, domain.ErrApplicationNotFound) {
+			JSONError(w, http.StatusNotFound, "application not found")
+			return
+		}
+		JSONError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+
+	JSONSuccess(w, http.StatusOK, APIResponse{
+		Message: "Application stopping",
+	})
+}
+
+func (h *ApplicationHandler) Restart(w http.ResponseWriter, r *http.Request) {
+	appID, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
+	if err != nil {
+		JSONError(w, http.StatusBadRequest, "invalid application id")
+		return
+	}
+
+	if err := h.svc.Restart(r.Context(), appID); err != nil {
+		if errors.Is(err, domain.ErrApplicationNotFound) {
+			JSONError(w, http.StatusNotFound, "application not found")
+			return
+		}
+		JSONError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+
+	JSONSuccess(w, http.StatusOK, APIResponse{
+		Message: "Application restarting",
+	})
+}
+
+// ============================================================================
+// ENVIRONMENT VARIABLES
+// ============================================================================
+
+func (h *ApplicationHandler) ListEnvVars(w http.ResponseWriter, r *http.Request) {
+	appID, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
+	if err != nil {
+		JSONError(w, http.StatusBadRequest, "invalid application id")
+		return
+	}
+
+	envVars, err := h.svc.ListEnvVars(r.Context(), appID)
+	if err != nil {
+		if errors.Is(err, domain.ErrApplicationNotFound) {
+			JSONError(w, http.StatusNotFound, "application not found")
+			return
+		}
+		JSONError(w, http.StatusInternalServerError, "failed to list environment variables")
+		return
+	}
+
+	JSONSuccess(w, http.StatusOK, APIResponse{
+		Message: "OK",
+		Data:    envVars,
+	})
+}
+
+func (h *ApplicationHandler) AddEnvVar(w http.ResponseWriter, r *http.Request) {
+	appID, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
+	if err != nil {
+		JSONError(w, http.StatusBadRequest, "invalid application id")
+		return
+	}
+
+	var req domain.EnvironmentVariableRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		JSONError(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+
+	if validationErrors := ValidateStruct(req); len(validationErrors) > 0 {
+		JSONValidationError(w, validationErrors)
+		return
+	}
+
+	if err := h.svc.AddEnvVar(r.Context(), appID, req); err != nil {
+		if errors.Is(err, domain.ErrApplicationNotFound) {
+			JSONError(w, http.StatusNotFound, "application not found")
+			return
+		}
+		JSONError(w, http.StatusInternalServerError, "failed to add environment variable")
+		return
+	}
+
+	JSONSuccess(w, http.StatusOK, APIResponse{
+		Message: "Environment variable added",
+	})
+}
+
+func (h *ApplicationHandler) UpdateEnvVar(w http.ResponseWriter, r *http.Request) {
+	appID, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
+	if err != nil {
+		JSONError(w, http.StatusBadRequest, "invalid application id")
+		return
+	}
+
+	key := r.PathValue("key")
+	if key == "" {
+		JSONError(w, http.StatusBadRequest, "key is required")
+		return
+	}
+
+	var req domain.EnvironmentVariableRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		JSONError(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+
+	if validationErrors := ValidateStruct(req); len(validationErrors) > 0 {
+		JSONValidationError(w, validationErrors)
+		return
+	}
+
+	if err := h.svc.UpdateEnvVar(r.Context(), appID, key, req); err != nil {
+		if errors.Is(err, domain.ErrApplicationNotFound) {
+			JSONError(w, http.StatusNotFound, "application not found")
+			return
+		}
+		JSONError(w, http.StatusInternalServerError, "failed to update environment variable")
+		return
+	}
+
+	JSONSuccess(w, http.StatusOK, APIResponse{
+		Message: "Environment variable updated",
+	})
+}
+
+func (h *ApplicationHandler) DeleteEnvVar(w http.ResponseWriter, r *http.Request) {
+	appID, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
+	if err != nil {
+		JSONError(w, http.StatusBadRequest, "invalid application id")
+		return
+	}
+
+	key := r.PathValue("key")
+	if key == "" {
+		JSONError(w, http.StatusBadRequest, "key is required")
+		return
+	}
+
+	if err := h.svc.DeleteEnvVar(r.Context(), appID, key); err != nil {
+		if errors.Is(err, domain.ErrApplicationNotFound) {
+			JSONError(w, http.StatusNotFound, "application not found")
+			return
+		}
+		JSONError(w, http.StatusInternalServerError, "failed to delete environment variable")
+		return
+	}
+
+	JSONSuccess(w, http.StatusOK, APIResponse{
+		Message: "Environment variable deleted",
+	})
+}
+
+// ============================================================================
+// VOLUMES
+// ============================================================================
+
+func (h *ApplicationHandler) ListVolumes(w http.ResponseWriter, r *http.Request) {
+	appID, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
+	if err != nil {
+		JSONError(w, http.StatusBadRequest, "invalid application id")
+		return
+	}
+
+	volumes, err := h.svc.ListVolumes(r.Context(), appID)
+	if err != nil {
+		if errors.Is(err, domain.ErrApplicationNotFound) {
+			JSONError(w, http.StatusNotFound, "application not found")
+			return
+		}
+		JSONError(w, http.StatusInternalServerError, "failed to list volumes")
+		return
+	}
+
+	JSONSuccess(w, http.StatusOK, APIResponse{
+		Message: "OK",
+		Data:    volumes,
+	})
+}
+
+func (h *ApplicationHandler) AddVolume(w http.ResponseWriter, r *http.Request) {
+	appID, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
+	if err != nil {
+		JSONError(w, http.StatusBadRequest, "invalid application id")
+		return
+	}
+
+	var req domain.VolumeRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		JSONError(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+
+	if validationErrors := ValidateStruct(req); len(validationErrors) > 0 {
+		JSONValidationError(w, validationErrors)
+		return
+	}
+
+	if err := h.svc.AddVolume(r.Context(), appID, req); err != nil {
+		if errors.Is(err, domain.ErrApplicationNotFound) {
+			JSONError(w, http.StatusNotFound, "application not found")
+			return
+		}
+		JSONError(w, http.StatusInternalServerError, "failed to add volume")
+		return
+	}
+
+	JSONSuccess(w, http.StatusOK, APIResponse{
+		Message: "Volume added",
+	})
+}
+
+func (h *ApplicationHandler) DeleteVolume(w http.ResponseWriter, r *http.Request) {
+	volumeID, err := strconv.ParseInt(r.PathValue("volume_id"), 10, 64)
+	if err != nil {
+		JSONError(w, http.StatusBadRequest, "invalid volume id")
+		return
+	}
+
+	if err := h.svc.DeleteVolume(r.Context(), volumeID); err != nil {
+		JSONError(w, http.StatusInternalServerError, "failed to delete volume")
+		return
+	}
+
+	JSONSuccess(w, http.StatusOK, APIResponse{
+		Message: "Volume deleted",
+	})
+}

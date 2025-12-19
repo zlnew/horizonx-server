@@ -29,16 +29,17 @@ type ServerSaveRequest struct {
 
 type ServerRepository interface {
 	List(ctx context.Context) ([]Server, error)
+	GetByID(ctx context.Context, serverID uuid.UUID) (*Server, error)
+	GetByToken(ctx context.Context, token string) (*Server, error)
 	Create(ctx context.Context, s *Server) (*Server, error)
 	Update(ctx context.Context, s *Server, serverID uuid.UUID) error
 	Delete(ctx context.Context, serverID uuid.UUID) error
-	GetByID(ctx context.Context, serverID uuid.UUID) (*Server, error)
-	GetByToken(ctx context.Context, token string) (*Server, error)
 	UpdateStatus(ctx context.Context, serverID uuid.UUID, isOnline bool) error
 }
 
 type ServerService interface {
 	Get(ctx context.Context) ([]Server, error)
+	GetByID(ctx context.Context, serverID uuid.UUID) (*Server, error)
 	Register(ctx context.Context, req ServerSaveRequest) (*Server, string, error)
 	Update(ctx context.Context, req ServerSaveRequest, serverID uuid.UUID) error
 	Delete(ctx context.Context, serverID uuid.UUID) error

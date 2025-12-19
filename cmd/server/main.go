@@ -12,6 +12,7 @@ import (
 	"horizonx-server/internal/adapters/ws/agentws"
 	"horizonx-server/internal/adapters/ws/userws"
 	"horizonx-server/internal/adapters/ws/userws/subscribers"
+	"horizonx-server/internal/application/application"
 	"horizonx-server/internal/application/auth"
 	"horizonx-server/internal/application/job"
 	"horizonx-server/internal/application/metrics"
@@ -46,19 +47,25 @@ func main() {
 	userRepo := postgres.NewUserRepository(dbPool)
 	jobRepo := postgres.NewJobRepository(dbPool)
 	metricsRepo := postgres.NewMetricsRepository(dbPool)
+	applicationRepo := postgres.NewApplicationRepository(dbPool)
 
+	// Services
 	serverService := server.NewService(serverRepo, bus)
 	authService := auth.NewService(userRepo, cfg.JWTSecret, cfg.JWTExpiry)
 	userService := user.NewService(userRepo)
 	jobService := job.NewService(jobRepo, bus)
 	metricsService := metrics.NewService(metricsRepo, bus, log)
+	applicationService := application.NewService(applicationRepo, serverService, jobService, bus)
 
+	// HTTP Handlers
 	serverHandler := http.NewServerHandler(serverService)
 	authHandler := http.NewAuthHandler(authService, cfg)
 	userHandler := http.NewUserHandler(userService)
 	jobHandler := http.NewJobHandler(jobService)
 	metricsHandler := http.NewMetricsHandler(metricsService, log)
+	applicationHandler := http.NewApplicationHandler(applicationService)
 
+	// WebSocket Handlers
 	wsUserhub := userws.NewHub(ctx, log)
 	wsUserHandler := userws.NewHandler(wsUserhub, log, cfg.JWTSecret, cfg.AllowedOrigins)
 
@@ -68,16 +75,18 @@ func main() {
 	go wsUserhub.Run()
 	go wsAgentRouter.Run()
 
+	// Register event subscribers
 	subscribers.Register(bus, wsUserhub)
 
 	router := http.NewRouter(cfg, &http.RouterDeps{
-		WsUser:  wsUserHandler,
-		WsAgent: wsAgentHandler,
-		Server:  serverHandler,
-		Auth:    authHandler,
-		User:    userHandler,
-		Job:     jobHandler,
-		Metrics: metricsHandler,
+		WsUser:      wsUserHandler,
+		WsAgent:     wsAgentHandler,
+		Server:      serverHandler,
+		Auth:        authHandler,
+		User:        userHandler,
+		Job:         jobHandler,
+		Metrics:     metricsHandler,
+		Application: applicationHandler,
 
 		ServerService: serverService,
 	})

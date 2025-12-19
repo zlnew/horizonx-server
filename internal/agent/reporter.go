@@ -82,7 +82,7 @@ func (r *MetricsReporter) sendBatch(ctx context.Context, batch []domain.Metrics)
 	maxRetries := 3
 	backoff := time.Second
 
-	for attempt := 0; attempt < maxRetries; attempt++ {
+	for attempt := range maxRetries {
 		if attempt > 0 {
 			r.log.Debug("retrying metrics send", "attempt", attempt+1)
 			select {

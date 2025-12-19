@@ -28,6 +28,10 @@ func (s *Service) Get(ctx context.Context) ([]domain.Server, error) {
 	return s.repo.List(ctx)
 }
 
+func (s *Service) GetByID(ctx context.Context, serverID uuid.UUID) (*domain.Server, error) {
+	return s.repo.GetByID(ctx, serverID)
+}
+
 func (s *Service) Register(ctx context.Context, req domain.ServerSaveRequest) (*domain.Server, string, error) {
 	token, err := pkg.GenerateToken()
 	if err != nil {
