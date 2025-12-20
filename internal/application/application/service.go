@@ -110,6 +110,30 @@ func (s *Service) Deploy(ctx context.Context, appID int64) error {
 		return err
 	}
 
+	envVars, err := s.repo.ListEnvVars(ctx, appID)
+	if err != nil {
+		return fmt.Errorf("failed to fetch env vars: %w", err)
+	}
+
+	envMap := make(map[string]string)
+	for _, env := range envVars {
+		envMap[env.Key] = env.Value
+	}
+
+	volumes, err := s.repo.ListVolumes(ctx, appID)
+	if err != nil {
+		return fmt.Errorf("failed to fetch volumes: %w", err)
+	}
+
+	volumeMounts := make([]domain.VolumeMount, len(volumes))
+	for i, vol := range volumes {
+		volumeMounts[i] = domain.VolumeMount{
+			HostPath:      vol.HostPath,
+			ContainerPath: vol.ContainerPath,
+			Mode:          vol.Mode,
+		}
+	}
+
 	if err := s.repo.UpdateStatus(ctx, appID, domain.AppStatusStarting); err != nil {
 		return err
 	}
@@ -117,12 +141,14 @@ func (s *Service) Deploy(ctx context.Context, appID int64) error {
 	job := &domain.Job{
 		ServerID:      app.ServerID,
 		ApplicationID: &appID,
-		JobType:       "deploy_app",
+		JobType:       domain.JobTypeDeployApp,
 		CommandPayload: map[string]any{
 			"application_id":     appID,
 			"repo_url":           app.RepoURL,
 			"branch":             app.Branch,
 			"docker_compose_raw": app.DockerComposeRaw,
+			"env_vars":           envMap,
+			"volumes":            volumeMounts,
 		},
 	}
 
@@ -152,7 +178,7 @@ func (s *Service) Start(ctx context.Context, appID int64) error {
 	job := &domain.Job{
 		ServerID:      app.ServerID,
 		ApplicationID: &appID,
-		JobType:       "start_app",
+		JobType:       domain.JobTypeStartApp,
 		CommandPayload: map[string]any{
 			"application_id": appID,
 		},
@@ -175,7 +201,7 @@ func (s *Service) Stop(ctx context.Context, appID int64) error {
 	job := &domain.Job{
 		ServerID:      app.ServerID,
 		ApplicationID: &appID,
-		JobType:       "stop_app",
+		JobType:       domain.JobTypeStopApp,
 		CommandPayload: map[string]any{
 			"application_id": appID,
 		},
@@ -198,7 +224,7 @@ func (s *Service) Restart(ctx context.Context, appID int64) error {
 	job := &domain.Job{
 		ServerID:      app.ServerID,
 		ApplicationID: &appID,
-		JobType:       "restart_app",
+		JobType:       domain.JobTypeRestartApp,
 		CommandPayload: map[string]any{
 			"application_id": appID,
 		},

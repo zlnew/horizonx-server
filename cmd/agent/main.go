@@ -37,7 +37,8 @@ func main() {
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
 
-	a := agent.NewAgent(cfg, appLog)
+	// Initialize components
+	wsAgent := agent.NewAgent(cfg, appLog)
 	sampler := metrics.NewSampler(appLog)
 	sampler.SetServerID(cfg.AgentServerID)
 
@@ -47,14 +48,28 @@ func main() {
 		appLog,
 	)
 
+	// Initialize job worker
+	jobWorker := agent.NewJobWorker(cfg, appLog, "/var/horizonx/apps")
+	if err := jobWorker.Initialize(); err != nil {
+		appLog.Error("failed to Initialize job worker", "error", err)
+		log.Fatal(err)
+	}
+
 	g, gCtx := errgroup.WithContext(ctx)
 
+	// 1. WebSocket connection for real-time commands
 	g.Go(func() error {
-		return a.Run(gCtx)
+		return wsAgent.Run(gCtx)
 	})
 
+	// 2. Metrics collection and reporting
 	g.Go(func() error {
 		return runMetricsCollector(gCtx, cfg, sampler, reporter, appLog)
+	})
+
+	// 3. Job worker (polls and executes jobs)
+	g.Go(func() error {
+		return jobWorker.Start(gCtx)
 	})
 
 	if err := g.Wait(); err != nil && err != context.Canceled && !agent.IsFatalError(err) {
