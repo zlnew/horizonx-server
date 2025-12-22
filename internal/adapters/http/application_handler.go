@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"strconv"
 
+	"horizonx-server/internal/adapters/http/middleware"
 	"horizonx-server/internal/domain"
 
 	"github.com/google/uuid"
@@ -65,11 +66,13 @@ func (h *ApplicationHandler) Show(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	envVars, _ := h.svc.ListEnvVars(r.Context(), appID)
-	volumes, _ := h.svc.ListVolumes(r.Context(), appID)
+	envVars, err := h.svc.ListEnvVars(r.Context(), appID)
+	if err != nil {
+		JSONError(w, http.StatusInternalServerError, "failed to get applications environment variables")
+		return
+	}
 
 	app.EnvVars = &envVars
-	app.Volumes = &volumes
 
 	JSONSuccess(w, http.StatusOK, APIResponse{
 		Message: "OK",
@@ -165,7 +168,13 @@ func (h *ApplicationHandler) Deploy(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := h.svc.Deploy(r.Context(), appID); err != nil {
+	userID, ok := middleware.GetUserID(r.Context())
+	if !ok {
+		JSONError(w, http.StatusUnauthorized, "unauthorized")
+		return
+	}
+
+	if err := h.svc.Deploy(r.Context(), appID, userID); err != nil {
 		if errors.Is(err, domain.ErrApplicationNotFound) {
 			JSONError(w, http.StatusNotFound, "application not found")
 			return
@@ -245,35 +254,6 @@ func (h *ApplicationHandler) Restart(w http.ResponseWriter, r *http.Request) {
 // ============================================================================
 // ENVIRONMENT VARIABLES
 // ============================================================================
-
-func (h *ApplicationHandler) ListEnvVars(w http.ResponseWriter, r *http.Request) {
-	appID, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
-	if err != nil {
-		JSONError(w, http.StatusBadRequest, "invalid application id")
-		return
-	}
-
-	envVars, err := h.svc.ListEnvVars(r.Context(), appID)
-	if err != nil {
-		if errors.Is(err, domain.ErrApplicationNotFound) {
-			JSONError(w, http.StatusNotFound, "application not found")
-			return
-		}
-		JSONError(w, http.StatusInternalServerError, "failed to list environment variables")
-		return
-	}
-
-	for i := range envVars {
-		if !envVars[i].IsPreview {
-			envVars[i].Value = "***HIDDEN***"
-		}
-	}
-
-	JSONSuccess(w, http.StatusOK, APIResponse{
-		Message: "OK",
-		Data:    envVars,
-	})
-}
 
 func (h *ApplicationHandler) AddEnvVar(w http.ResponseWriter, r *http.Request) {
 	appID, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
@@ -369,81 +349,5 @@ func (h *ApplicationHandler) DeleteEnvVar(w http.ResponseWriter, r *http.Request
 
 	JSONSuccess(w, http.StatusOK, APIResponse{
 		Message: "Environment variable deleted",
-	})
-}
-
-// ============================================================================
-// VOLUMES
-// ============================================================================
-
-func (h *ApplicationHandler) ListVolumes(w http.ResponseWriter, r *http.Request) {
-	appID, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
-	if err != nil {
-		JSONError(w, http.StatusBadRequest, "invalid application id")
-		return
-	}
-
-	volumes, err := h.svc.ListVolumes(r.Context(), appID)
-	if err != nil {
-		if errors.Is(err, domain.ErrApplicationNotFound) {
-			JSONError(w, http.StatusNotFound, "application not found")
-			return
-		}
-		JSONError(w, http.StatusInternalServerError, "failed to list volumes")
-		return
-	}
-
-	JSONSuccess(w, http.StatusOK, APIResponse{
-		Message: "OK",
-		Data:    volumes,
-	})
-}
-
-func (h *ApplicationHandler) AddVolume(w http.ResponseWriter, r *http.Request) {
-	appID, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
-	if err != nil {
-		JSONError(w, http.StatusBadRequest, "invalid application id")
-		return
-	}
-
-	var req domain.VolumeRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		JSONError(w, http.StatusBadRequest, "invalid request body")
-		return
-	}
-
-	if validationErrors := ValidateStruct(req); len(validationErrors) > 0 {
-		JSONValidationError(w, validationErrors)
-		return
-	}
-
-	if err := h.svc.AddVolume(r.Context(), appID, req); err != nil {
-		if errors.Is(err, domain.ErrApplicationNotFound) {
-			JSONError(w, http.StatusNotFound, "application not found")
-			return
-		}
-		JSONError(w, http.StatusInternalServerError, "failed to add volume")
-		return
-	}
-
-	JSONSuccess(w, http.StatusOK, APIResponse{
-		Message: "Volume added",
-	})
-}
-
-func (h *ApplicationHandler) DeleteVolume(w http.ResponseWriter, r *http.Request) {
-	volumeID, err := strconv.ParseInt(r.PathValue("volume_id"), 10, 64)
-	if err != nil {
-		JSONError(w, http.StatusBadRequest, "invalid volume id")
-		return
-	}
-
-	if err := h.svc.DeleteVolume(r.Context(), volumeID); err != nil {
-		JSONError(w, http.StatusInternalServerError, "failed to delete volume")
-		return
-	}
-
-	JSONSuccess(w, http.StatusOK, APIResponse{
-		Message: "Volume deleted",
 	})
 }

@@ -37,7 +37,6 @@ func (s *Service) Create(ctx context.Context, req domain.DeploymentCreateRequest
 		ApplicationID: req.ApplicationID,
 		JobID:         req.JobID,
 		Branch:        req.Branch,
-		Environment:   req.Environment,
 		DeployedBy:    req.DeployedBy,
 		Status:        domain.DeploymentPending,
 	}
@@ -47,12 +46,7 @@ func (s *Service) Create(ctx context.Context, req domain.DeploymentCreateRequest
 		return nil, err
 	}
 
-	// Publish event
 	if s.bus != nil {
-		s.bus.Publish("deployment_created", domain.EventDeploymentCreated{
-			Deployment: created,
-		})
-
 		s.bus.Publish("deployment_status_changed", domain.EventDeploymentStatusChanged{
 			DeploymentID:  created.ID,
 			ApplicationID: created.ApplicationID,

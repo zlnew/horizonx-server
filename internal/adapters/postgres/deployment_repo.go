@@ -22,7 +22,7 @@ func NewDeploymentRepository(db *pgxpool.Pool) domain.DeploymentRepository {
 
 func (r *DeploymentRepository) List(ctx context.Context, appID int64, limit int) ([]domain.Deployment, error) {
 	if limit <= 0 {
-		limit = 50 // Default limit
+		limit = 50
 	}
 
 	query := `
@@ -124,8 +124,8 @@ func (r *DeploymentRepository) GetLatest(ctx context.Context, appID int64) (*dom
 
 func (r *DeploymentRepository) Create(ctx context.Context, deployment *domain.Deployment) (*domain.Deployment, error) {
 	query := `
-		INSERT INTO deployments (application_id, commit_hash, commit_message, status, started_at)
-		VALUES ($1, $2, $3, $4, $5)
+		INSERT INTO deployments (application_id, branch, commit_hash, commit_message, deployed_by, status, started_at)
+		VALUES ($1, $2, $3, $4, $5, $6, $7)
 		RETURNING id, started_at
 	`
 
@@ -133,8 +133,10 @@ func (r *DeploymentRepository) Create(ctx context.Context, deployment *domain.De
 	err := r.db.QueryRow(
 		ctx, query,
 		deployment.ApplicationID,
+		deployment.Branch,
 		deployment.CommitHash,
 		deployment.CommitMessage,
+		deployment.DeployedBy,
 		domain.DeploymentPending,
 		now,
 	).Scan(&deployment.ID, &deployment.StartedAt)

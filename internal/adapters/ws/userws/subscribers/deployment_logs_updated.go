@@ -21,16 +21,8 @@ func (s *DeploymentLogsUpdated) Handle(event any) {
 		return
 	}
 
-	// Broadcast to deployment-specific channel
 	s.hub.Broadcast(&domain.WsServerEvent{
 		Channel: fmt.Sprintf("deployment:%d", evt.DeploymentID),
-		Event:   "deployment_logs_updated",
-		Payload: evt,
-	})
-
-	// Also broadcast to application channel
-	s.hub.Broadcast(&domain.WsServerEvent{
-		Channel: fmt.Sprintf("application:%d", evt.ApplicationID),
 		Event:   "deployment_logs_updated",
 		Payload: evt,
 	})

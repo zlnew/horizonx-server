@@ -167,7 +167,7 @@ func (w *JobWorker) executeWithLogStreaming(ctx context.Context, job *domain.Job
 		output, err := w.executor.Execute(ctx, job)
 		logBuffer.WriteString(output)
 
-		// Stream logs during execution (simplified - in production you'd stream progressively)
+		// Stream logs during execution
 		if err == nil {
 			w.sendDeploymentLogs(ctx, *deploymentID, output, true)
 		}

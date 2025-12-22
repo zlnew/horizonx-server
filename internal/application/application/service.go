@@ -54,12 +54,11 @@ func (s *Service) Create(ctx context.Context, req domain.ApplicationCreateReques
 	}
 
 	app := &domain.Application{
-		ServerID:         req.ServerID,
-		Name:             req.Name,
-		RepoURL:          req.RepoURL,
-		Branch:           req.Branch,
-		DockerComposeRaw: req.DockerComposeRaw,
-		Status:           domain.AppStatusStopped,
+		ServerID: req.ServerID,
+		Name:     req.Name,
+		RepoURL:  req.RepoURL,
+		Branch:   req.Branch,
+		Status:   domain.AppStatusStopped,
 	}
 	created, err := s.repo.Create(ctx, app)
 	if err != nil {
@@ -78,18 +77,6 @@ func (s *Service) Create(ctx context.Context, req domain.ApplicationCreateReques
 		return nil, err
 	}
 
-	var volumes []domain.Volume
-	for _, vol := range req.Volumes {
-		volumes = append(volumes, domain.Volume{
-			HostPath:      vol.HostPath,
-			ContainerPath: vol.ContainerPath,
-			Mode:          vol.Mode,
-		})
-	}
-	if err := s.repo.SyncVolumes(ctx, created.ID, volumes); err != nil {
-		return nil, err
-	}
-
 	if s.bus != nil {
 		s.bus.Publish("application_created", created)
 	}
@@ -104,10 +91,9 @@ func (s *Service) Update(ctx context.Context, req domain.ApplicationUpdateReques
 	}
 
 	app := &domain.Application{
-		Name:             req.Name,
-		RepoURL:          req.RepoURL,
-		Branch:           req.Branch,
-		DockerComposeRaw: req.DockerComposeRaw,
+		Name:    req.Name,
+		RepoURL: req.RepoURL,
+		Branch:  req.Branch,
 	}
 	if err := s.repo.Update(ctx, app, appID); err != nil {
 		return err
@@ -122,18 +108,6 @@ func (s *Service) Update(ctx context.Context, req domain.ApplicationUpdateReques
 		})
 	}
 	if err := s.repo.SyncEnvVars(ctx, appID, envVars); err != nil {
-		return err
-	}
-
-	var volumes []domain.Volume
-	for _, vol := range req.Volumes {
-		volumes = append(volumes, domain.Volume{
-			HostPath:      vol.HostPath,
-			ContainerPath: vol.ContainerPath,
-			Mode:          vol.Mode,
-		})
-	}
-	if err := s.repo.SyncVolumes(ctx, appID, volumes); err != nil {
 		return err
 	}
 
@@ -153,11 +127,31 @@ func (s *Service) Delete(ctx context.Context, appID int64) error {
 	return s.repo.Delete(ctx, appID)
 }
 
+func (s *Service) UpdateStatus(ctx context.Context, appID int64, status domain.ApplicationStatus) error {
+	err := s.repo.UpdateStatus(ctx, appID, status)
+	if err != nil {
+		return err
+	}
+
+	if s.bus != nil {
+		s.bus.Publish("application_status_changed", domain.EventApplicationStatusChanged{
+			ApplicationID: appID,
+			Status:        status,
+		})
+	}
+
+	return nil
+}
+
+func (s *Service) UpdateLastDeployment(ctx context.Context, appID int64) error {
+	return s.repo.UpdateLastDeployment(ctx, appID)
+}
+
 // ============================================================================
 // ACTIONS (Job-based)
 // ============================================================================
 
-func (s *Service) Deploy(ctx context.Context, appID int64) error {
+func (s *Service) Deploy(ctx context.Context, appID int64, deployedBy int64) error {
 	app, err := s.repo.GetByID(ctx, appID)
 	if err != nil {
 		return err
@@ -173,24 +167,10 @@ func (s *Service) Deploy(ctx context.Context, appID int64) error {
 		envMap[env.Key] = env.Value
 	}
 
-	volumes, err := s.repo.ListVolumes(ctx, appID)
-	if err != nil {
-		return fmt.Errorf("failed to fetch volumes: %w", err)
-	}
-
-	volumeMounts := make([]domain.VolumeMount, len(volumes))
-	for i, vol := range volumes {
-		volumeMounts[i] = domain.VolumeMount{
-			HostPath:      vol.HostPath,
-			ContainerPath: vol.ContainerPath,
-			Mode:          vol.Mode,
-		}
-	}
-
 	deployment, err := s.deploymentSvc.Create(ctx, domain.DeploymentCreateRequest{
 		ApplicationID: appID,
 		Branch:        app.Branch,
-		Environment:   "production", // TODO: Make this configurable
+		DeployedBy:    &deployedBy,
 	})
 	if err != nil {
 		return fmt.Errorf("failed to create deployment record: %w", err)
@@ -203,15 +183,14 @@ func (s *Service) Deploy(ctx context.Context, appID int64) error {
 	job := &domain.Job{
 		ServerID:      app.ServerID,
 		ApplicationID: &appID,
+		DeploymentID:  &deployment.ID,
 		JobType:       domain.JobTypeDeployApp,
 		CommandPayload: map[string]any{
-			"application_id":     appID,
-			"deployment_id":      deployment.ID,
-			"repo_url":           app.RepoURL,
-			"branch":             app.Branch,
-			"docker_compose_raw": app.DockerComposeRaw,
-			"env_vars":           envMap,
-			"volumes":            volumeMounts,
+			"application_id": appID,
+			"deployment_id":  deployment.ID,
+			"repo_url":       app.RepoURL,
+			"branch":         app.Branch,
+			"env_vars":       envMap,
 		},
 	}
 
@@ -355,37 +334,4 @@ func (s *Service) DeleteEnvVar(ctx context.Context, appID int64, key string) err
 	}
 
 	return s.repo.DeleteEnvVar(ctx, appID, key)
-}
-
-// ============================================================================
-// VOLUMES
-// ============================================================================
-
-func (s *Service) ListVolumes(ctx context.Context, appID int64) ([]domain.Volume, error) {
-	_, err := s.repo.GetByID(ctx, appID)
-	if err != nil {
-		return nil, err
-	}
-
-	return s.repo.ListVolumes(ctx, appID)
-}
-
-func (s *Service) AddVolume(ctx context.Context, appID int64, req domain.VolumeRequest) error {
-	_, err := s.repo.GetByID(ctx, appID)
-	if err != nil {
-		return err
-	}
-
-	vol := &domain.Volume{
-		ApplicationID: appID,
-		HostPath:      req.HostPath,
-		ContainerPath: req.ContainerPath,
-		Mode:          req.Mode,
-	}
-
-	return s.repo.CreateVolume(ctx, vol)
-}
-
-func (s *Service) DeleteVolume(ctx context.Context, volumeID int64) error {
-	return s.repo.DeleteVolume(ctx, volumeID)
 }

@@ -22,24 +22,23 @@ type Deployment struct {
 	ID            int64            `json:"id"`
 	ApplicationID int64            `json:"application_id"`
 	JobID         *int64           `json:"job_id,omitempty"`
+	Branch        string           `json:"branch"`
 	CommitHash    *string          `json:"commit_hash,omitempty"`
 	CommitMessage *string          `json:"commit_message,omitempty"`
 	Status        DeploymentStatus `json:"status"`
 	BuildLogs     *string          `json:"build_logs,omitempty"`
 	StartedAt     time.Time        `json:"started_at"`
 	FinishedAt    *time.Time       `json:"finished_at,omitempty"`
+	DeployedBy    *int64           `json:"deployed_by,omitempty"`
 
-	DeployedBy  *string `json:"deployed_by,omitempty"`
-	Branch      string  `json:"branch"`
-	Environment string  `json:"environment"`
+	Deployer *User `json:"deployer,omitempty"`
 }
 
 type DeploymentCreateRequest struct {
-	ApplicationID int64   `json:"application_id"`
-	JobID         *int64  `json:"job_id,omitempty"`
-	Branch        string  `json:"branch"`
-	Environment   string  `json:"environment"`
-	DeployedBy    *string `json:"deployed_by,omitempty"`
+	ApplicationID int64  `json:"application_id"`
+	JobID         *int64 `json:"job_id,omitempty"`
+	Branch        string `json:"branch"`
+	DeployedBy    *int64 `json:"deployed_by,omitempty"`
 }
 
 type DeploymentRepository interface {
@@ -58,28 +57,4 @@ type DeploymentService interface {
 	GetByID(ctx context.Context, deploymentID int64) (*Deployment, error)
 	GetLatest(ctx context.Context, appID int64) (*Deployment, error)
 	Create(ctx context.Context, req DeploymentCreateRequest) (*Deployment, error)
-}
-
-type EventDeploymentCreated struct {
-	Deployment *Deployment `json:"deployment"`
-}
-
-type EventDeploymentStatusChanged struct {
-	DeploymentID  int64            `json:"deployment_id"`
-	ApplicationID int64            `json:"application_id"`
-	Status        DeploymentStatus `json:"status"`
-}
-
-type EventDeploymentLogsUpdated struct {
-	DeploymentID  int64  `json:"deployment_id"`
-	ApplicationID int64  `json:"application_id"`
-	Logs          string `json:"logs"`
-	IsPartial     bool   `json:"is_partial"`
-}
-
-type EventDeploymentCompleted struct {
-	DeploymentID  int64            `json:"deployment_id"`
-	ApplicationID int64            `json:"application_id"`
-	Status        DeploymentStatus `json:"status"`
-	Logs          string           `json:"logs"`
 }

@@ -28,7 +28,7 @@ func (s *DeploymentStatusChanged) Handle(event any) {
 	})
 
 	s.hub.Broadcast(&domain.WsServerEvent{
-		Channel: fmt.Sprintf("application:%d", evt.ApplicationID),
+		Channel: "deployments",
 		Event:   "deployment_status_changed",
 		Payload: evt,
 	})

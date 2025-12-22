@@ -33,7 +33,7 @@ func JWT(cfg *config.Config) func(http.Handler) http.Handler {
 	}
 }
 
-func GetUserID(ctx context.Context) (string, bool) {
-	id, ok := ctx.Value(UserIDKey).(string)
+func GetUserID(ctx context.Context) (int64, bool) {
+	id, ok := ctx.Value(UserIDKey).(int64)
 	return id, ok
 }

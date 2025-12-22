@@ -27,8 +27,7 @@ func NewApplicationRepository(db *pgxpool.Pool) domain.ApplicationRepository {
 
 func (r *ApplicationRepository) List(ctx context.Context, serverID uuid.UUID) ([]domain.Application, error) {
 	query := `
-		SELECT id, server_id, name, repo_url, branch, docker_compose_raw, 
-		       status, last_deployment_at, created_at, updated_at
+		SELECT id, server_id, name, repo_url, branch, status, last_deployment_at, created_at, updated_at
 		FROM applications
 		WHERE server_id = $1 AND deleted_at IS NULL
 		ORDER BY created_at DESC
@@ -49,7 +48,6 @@ func (r *ApplicationRepository) List(ctx context.Context, serverID uuid.UUID) ([
 			&app.Name,
 			&app.RepoURL,
 			&app.Branch,
-			&app.DockerComposeRaw,
 			&app.Status,
 			&app.LastDeploymentAt,
 			&app.CreatedAt,
@@ -66,8 +64,7 @@ func (r *ApplicationRepository) List(ctx context.Context, serverID uuid.UUID) ([
 
 func (r *ApplicationRepository) GetByID(ctx context.Context, appID int64) (*domain.Application, error) {
 	query := `
-		SELECT id, server_id, name, repo_url, branch, docker_compose_raw, 
-		       status, last_deployment_at, created_at, updated_at
+		SELECT id, server_id, name, repo_url, branch, status, last_deployment_at, created_at, updated_at
 		FROM applications
 		WHERE id = $1 AND deleted_at IS NULL
 	`
@@ -79,7 +76,6 @@ func (r *ApplicationRepository) GetByID(ctx context.Context, appID int64) (*doma
 		&app.Name,
 		&app.RepoURL,
 		&app.Branch,
-		&app.DockerComposeRaw,
 		&app.Status,
 		&app.LastDeploymentAt,
 		&app.CreatedAt,
@@ -97,8 +93,8 @@ func (r *ApplicationRepository) GetByID(ctx context.Context, appID int64) (*doma
 
 func (r *ApplicationRepository) Create(ctx context.Context, app *domain.Application) (*domain.Application, error) {
 	query := `
-		INSERT INTO applications (server_id, name, repo_url, branch, docker_compose_raw, status, created_at, updated_at)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+		INSERT INTO applications (server_id, name, repo_url, branch, status, created_at, updated_at)
+		VALUES ($1, $2, $3, $4, $5, $6, $7)
 		RETURNING id, created_at, updated_at
 	`
 
@@ -109,7 +105,6 @@ func (r *ApplicationRepository) Create(ctx context.Context, app *domain.Applicat
 		app.Name,
 		app.RepoURL,
 		app.Branch,
-		app.DockerComposeRaw,
 		domain.AppStatusStopped,
 		now,
 		now,
@@ -124,7 +119,7 @@ func (r *ApplicationRepository) Create(ctx context.Context, app *domain.Applicat
 func (r *ApplicationRepository) Update(ctx context.Context, app *domain.Application, appID int64) error {
 	query := `
 		UPDATE applications
-		SET name = $1, repo_url = $2, branch = $3, docker_compose_raw = $4, updated_at = $5
+		SET name = $1, repo_url = $2, branch = $3, updated_at = $4
 		WHERE id = $6 AND deleted_at IS NULL
 	`
 
@@ -133,7 +128,6 @@ func (r *ApplicationRepository) Update(ctx context.Context, app *domain.Applicat
 		app.Name,
 		app.RepoURL,
 		app.Branch,
-		app.DockerComposeRaw,
 		now,
 		appID,
 	)
@@ -370,156 +364,6 @@ func (r *ApplicationRepository) DeleteEnvVar(ctx context.Context, appID int64, k
 
 	if ct.RowsAffected() == 0 {
 		return fmt.Errorf("env var not found")
-	}
-
-	return nil
-}
-
-// ============================================================================
-// VOLUMES
-// ============================================================================
-
-func (r *ApplicationRepository) SyncVolumes(ctx context.Context, appID int64, volumes []domain.Volume) error {
-	if len(volumes) == 0 {
-		return nil
-	}
-
-	tx, err := r.db.Begin(ctx)
-	if err != nil {
-		return fmt.Errorf("failed to begin tx: %w", err)
-	}
-	defer tx.Rollback(ctx)
-
-	batch := &pgx.Batch{}
-	identities := make([]string, 0, len(volumes))
-
-	for _, v := range volumes {
-		identity := v.HostPath + "->" + v.ContainerPath
-		identities = append(identities, identity)
-
-		batch.Queue(`
-			INSERT INTO volumes (
-				application_id,
-				host_path,
-				container_path,
-				mode
-			)
-			VALUES ($1, $2, $3, $4)
-			ON CONFLICT DO NOTHING
-		`,
-			appID,
-			v.HostPath,
-			v.ContainerPath,
-			v.Mode,
-		)
-
-		batch.Queue(`
-			UPDATE volumes
-			SET mode = $4
-			WHERE application_id = $1
-			  AND host_path = $2
-			  AND container_path = $3
-		`,
-			appID,
-			v.HostPath,
-			v.ContainerPath,
-			v.Mode,
-		)
-	}
-
-	br := tx.SendBatch(ctx, batch)
-	if _, err := br.Exec(); err != nil {
-		br.Close()
-		return fmt.Errorf("failed to sync volumes: %w", err)
-	}
-	br.Close()
-
-	_, err = tx.Exec(ctx, `
-		DELETE FROM volumes
-		WHERE application_id = $1
-		  AND (host_path || '->' || container_path)
-		      NOT IN (SELECT unnest($2::text[]))
-	`,
-		appID,
-		identities,
-	)
-	if err != nil {
-		return fmt.Errorf("failed to delete stale volumes: %w", err)
-	}
-
-	if err := tx.Commit(ctx); err != nil {
-		return fmt.Errorf("failed to commit tx: %w", err)
-	}
-
-	return nil
-}
-
-func (r *ApplicationRepository) ListVolumes(ctx context.Context, appID int64) ([]domain.Volume, error) {
-	query := `
-		SELECT id, application_id, host_path, container_path, mode, created_at
-		FROM volumes
-		WHERE application_id = $1
-		ORDER BY created_at ASC
-	`
-
-	rows, err := r.db.Query(ctx, query, appID)
-	if err != nil {
-		return nil, fmt.Errorf("failed to query volumes: %w", err)
-	}
-	defer rows.Close()
-
-	var volumes []domain.Volume
-	for rows.Next() {
-		var vol domain.Volume
-		err := rows.Scan(
-			&vol.ID,
-			&vol.ApplicationID,
-			&vol.HostPath,
-			&vol.ContainerPath,
-			&vol.Mode,
-			&vol.CreatedAt,
-		)
-		if err != nil {
-			return nil, fmt.Errorf("failed to scan volume: %w", err)
-		}
-		volumes = append(volumes, vol)
-	}
-
-	return volumes, nil
-}
-
-func (r *ApplicationRepository) CreateVolume(ctx context.Context, vol *domain.Volume) error {
-	query := `
-		INSERT INTO volumes (application_id, host_path, container_path, mode, created_at)
-		VALUES ($1, $2, $3, $4, $5)
-		RETURNING id, created_at
-	`
-
-	now := time.Now().UTC()
-	err := r.db.QueryRow(ctx, query,
-		vol.ApplicationID,
-		vol.HostPath,
-		vol.ContainerPath,
-		vol.Mode,
-		now,
-	).Scan(&vol.ID, &vol.CreatedAt)
-	if err != nil {
-		return fmt.Errorf("failed to create volume: %w", err)
-	}
-
-	return nil
-}
-
-func (r *ApplicationRepository) DeleteVolume(ctx context.Context, volumeID int64) error {
-	query := `DELETE FROM volumes WHERE id = $1`
-
-	ct, err := r.db.Exec(ctx, query, volumeID)
-	if err != nil {
-		return fmt.Errorf("failed to delete volume: %w", err)
-	}
-
-	if ct.RowsAffected() == 0 {
-		return fmt.Errorf("volume not found")
 	}
 
 	return nil

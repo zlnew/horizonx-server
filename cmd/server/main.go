@@ -61,10 +61,10 @@ func main() {
 	applicationService := application.NewService(applicationRepo, serverService, jobService, deploymentService, bus)
 
 	// Event Listeners
-	statusListener := application.NewStatusListener(applicationRepo, log)
-	statusListener.Register(bus)
+	applicationListener := application.NewListener(applicationService, log)
+	applicationListener.Register(bus)
 
-	deploymentListener := deployment.NewListener(deploymentRepo, log)
+	deploymentListener := deployment.NewListener(deploymentService, log)
 	deploymentListener.Register(bus)
 
 	// HTTP Handlers
@@ -73,8 +73,8 @@ func main() {
 	userHandler := http.NewUserHandler(userService)
 	jobHandler := http.NewJobHandler(jobService)
 	metricsHandler := http.NewMetricsHandler(metricsService, log)
-	applicationHandler := http.NewApplicationHandler(applicationService)
 	deploymentHandler := http.NewDeploymentHandler(deploymentService, deploymentRepo, bus, log)
+	applicationHandler := http.NewApplicationHandler(applicationService)
 
 	// WebSocket Handlers
 	wsUserhub := userws.NewHub(ctx, log)

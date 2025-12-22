@@ -25,6 +25,7 @@ func (r *JobRepository) List(ctx context.Context) ([]domain.Job, error) {
 			id,
 			server_id,
 			application_id,
+			deployment_id,
 			job_type,
 			status,
 			output_log,
@@ -49,6 +50,7 @@ func (r *JobRepository) List(ctx context.Context) ([]domain.Job, error) {
 			&j.ID,
 			&j.ServerID,
 			&j.ApplicationID,
+			&j.DeploymentID,
 			&j.JobType,
 			&j.Status,
 			&j.OutputLog,
@@ -75,6 +77,7 @@ func (r *JobRepository) GetByID(ctx context.Context, jobID int64) (*domain.Job, 
 			id,
 			server_id,
 			application_id,
+			deployment_id,
 			job_type,
 			command_payload,
 			status,
@@ -91,6 +94,7 @@ func (r *JobRepository) GetByID(ctx context.Context, jobID int64) (*domain.Job, 
 		&j.ID,
 		&j.ServerID,
 		&j.ApplicationID,
+		&j.DeploymentID,
 		&j.JobType,
 		&j.CommandPayload,
 		&j.Status,
@@ -113,14 +117,15 @@ func (r *JobRepository) GetByID(ctx context.Context, jobID int64) (*domain.Job, 
 func (r *JobRepository) Create(ctx context.Context, j *domain.Job) (*domain.Job, error) {
 	query := `
 		INSERT INTO server_jobs
-		(server_id, application_id, job_type)
-		VALUES ($1, $2, $3)
+		(server_id, application_id, deployment_id, job_type)
+		VALUES ($1, $2, $3, $4)
 		RETURNING id, queued_at
 	`
 
 	err := r.db.QueryRow(ctx, query,
 		j.ServerID,
 		j.ApplicationID,
+		j.DeploymentID,
 		j.JobType,
 	).Scan(
 		&j.ID,
@@ -164,6 +169,7 @@ func (r *JobRepository) MarkRunning(ctx context.Context, jobID int64) (*domain.J
 			id,
 			server_id,
 			application_id,
+			deployment_id,
 			job_type,
 			command_payload,
 			status,
@@ -178,6 +184,7 @@ func (r *JobRepository) MarkRunning(ctx context.Context, jobID int64) (*domain.J
 		&job.ID,
 		&job.ServerID,
 		&job.ApplicationID,
+		&job.DeploymentID,
 		&job.JobType,
 		&job.CommandPayload,
 		&job.Status,
@@ -215,6 +222,7 @@ func (r *JobRepository) MarkFinished(
 			id,
 			server_id,
 			application_id,
+			deployment_id,
 			job_type,
 			command_payload,
 			status,
@@ -229,6 +237,7 @@ func (r *JobRepository) MarkFinished(
 		&job.ID,
 		&job.ServerID,
 		&job.ApplicationID,
+		&job.DeploymentID,
 		&job.JobType,
 		&job.CommandPayload,
 		&job.Status,

@@ -27,14 +27,6 @@ func (s *JobStatusChanged) Handle(event any) {
 		Payload: evt,
 	})
 
-	if evt.ApplicationID != nil {
-		s.hub.Broadcast(&domain.WsServerEvent{
-			Channel: fmt.Sprintf("application:%d", *evt.ApplicationID),
-			Event:   "job_status_changed",
-			Payload: evt,
-		})
-	}
-
 	s.hub.Broadcast(&domain.WsServerEvent{
 		Channel: "jobs",
 		Event:   "job_status_changed",

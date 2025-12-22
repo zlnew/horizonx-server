@@ -27,7 +27,6 @@ func NewDeploymentHandler(svc domain.DeploymentService, repo domain.DeploymentRe
 	}
 }
 
-// List returns deployment history for an application
 func (h *DeploymentHandler) List(w http.ResponseWriter, r *http.Request) {
 	appIDStr := r.PathValue("id")
 	appID, err := strconv.ParseInt(appIDStr, 10, 64)
@@ -37,7 +36,7 @@ func (h *DeploymentHandler) List(w http.ResponseWriter, r *http.Request) {
 	}
 
 	limitStr := r.URL.Query().Get("limit")
-	limit := 50 // default
+	limit := 50
 	if limitStr != "" {
 		if parsed, err := strconv.Atoi(limitStr); err == nil && parsed > 0 {
 			limit = parsed
@@ -56,7 +55,6 @@ func (h *DeploymentHandler) List(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-// Show returns a single deployment with full logs
 func (h *DeploymentHandler) Show(w http.ResponseWriter, r *http.Request) {
 	deploymentIDStr := r.PathValue("deployment_id")
 	deploymentID, err := strconv.ParseInt(deploymentIDStr, 10, 64)
@@ -81,7 +79,6 @@ func (h *DeploymentHandler) Show(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-// GetLatest returns the latest deployment for an application
 func (h *DeploymentHandler) GetLatest(w http.ResponseWriter, r *http.Request) {
 	appIDStr := r.PathValue("id")
 	appID, err := strconv.ParseInt(appIDStr, 10, 64)
@@ -106,7 +103,6 @@ func (h *DeploymentHandler) GetLatest(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-// UpdateLogs handles real-time log updates from agent (agent endpoint)
 func (h *DeploymentHandler) UpdateLogs(w http.ResponseWriter, r *http.Request) {
 	deploymentIDStr := r.PathValue("id")
 	deploymentID, err := strconv.ParseInt(deploymentIDStr, 10, 64)
@@ -125,21 +121,18 @@ func (h *DeploymentHandler) UpdateLogs(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Get deployment to get application_id
 	deployment, err := h.repo.GetByID(r.Context(), deploymentID)
 	if err != nil {
 		JSONError(w, http.StatusNotFound, "deployment not found")
 		return
 	}
 
-	// Update logs in database
 	if err := h.repo.UpdateLogs(r.Context(), deploymentID, payload.Logs); err != nil {
 		h.log.Error("failed to update deployment logs", "error", err)
 		JSONError(w, http.StatusInternalServerError, "failed to update logs")
 		return
 	}
 
-	// Broadcast logs via WebSocket
 	if h.bus != nil {
 		h.bus.Publish("deployment_logs_updated", domain.EventDeploymentLogsUpdated{
 			DeploymentID:  deploymentID,

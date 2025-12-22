@@ -57,6 +57,7 @@ func NewRouter(cfg *config.Config, deps *RouterDeps) http.Handler {
 	mux.Handle("GET /agent/jobs", agentStack.Then(http.HandlerFunc(deps.Job.Index)))
 	mux.Handle("POST /agent/jobs/{id}/start", agentStack.Then(http.HandlerFunc(deps.Job.Start)))
 	mux.Handle("POST /agent/jobs/{id}/finish", agentStack.Then(http.HandlerFunc(deps.Job.Finish)))
+	mux.Handle("POST /agent/deployments/{id}/logs", agentStack.Then(http.HandlerFunc(deps.Deployment.UpdateLogs)))
 
 	// SERVERS
 	mux.Handle("GET /servers", userStack.Then(http.HandlerFunc(deps.Server.Index)))
@@ -91,18 +92,12 @@ func NewRouter(cfg *config.Config, deps *RouterDeps) http.Handler {
 	// DEPLOYMENTS
 	mux.Handle("GET /applications/{id}/deployments", userStack.Then(http.HandlerFunc(deps.Deployment.List)))
 	mux.Handle("GET /applications/{id}/deployments/latest", userStack.Then(http.HandlerFunc(deps.Deployment.GetLatest)))
-	mux.Handle("GET /deployments/{deployment_id}", userStack.Then(http.HandlerFunc(deps.Deployment.Show)))
+	mux.Handle("GET /applications/{id}/deployments/{deployment_id}", userStack.Then(http.HandlerFunc(deps.Deployment.Show)))
 
 	// ENVIRONMENT VARIABLES
-	mux.Handle("GET /applications/{id}/env", userStack.Then(http.HandlerFunc(deps.Application.ListEnvVars)))
 	mux.Handle("POST /applications/{id}/env", userStack.Then(http.HandlerFunc(deps.Application.AddEnvVar)))
 	mux.Handle("PUT /applications/{id}/env/{key}", userStack.Then(http.HandlerFunc(deps.Application.UpdateEnvVar)))
 	mux.Handle("DELETE /applications/{id}/env/{key}", userStack.Then(http.HandlerFunc(deps.Application.DeleteEnvVar)))
-
-	// VOLUMES
-	mux.Handle("GET /applications/{id}/volumes", userStack.Then(http.HandlerFunc(deps.Application.ListVolumes)))
-	mux.Handle("POST /applications/{id}/volumes", userStack.Then(http.HandlerFunc(deps.Application.AddVolume)))
-	mux.Handle("DELETE /applications/{id}/volumes/{volume_id}", userStack.Then(http.HandlerFunc(deps.Application.DeleteVolume)))
 
 	return globalMw.Apply(mux)
 }
