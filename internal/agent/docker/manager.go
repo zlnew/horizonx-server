@@ -92,20 +92,32 @@ func (m *Manager) ComposePs(ctx context.Context, appID int64) (string, error) {
 	return m.runDockerCommand(ctx, appDir, "compose", "ps")
 }
 
-func (m *Manager) WriteDockerComposeFile(appID int64, content string) error {
+func (m *Manager) ValidateDockerComposeFile(appID int64) error {
 	appDir := m.GetAppDir(appID)
 
-	if err := os.MkdirAll(appDir, 0o755); err != nil {
-		return fmt.Errorf("failed to create app directory: %w", err)
+	composeFileNames := []string{
+		"docker-compose.yml",
+		"docker-compose.yaml",
+		"compose.yml",
+		"compose.yaml",
 	}
 
-	composePath := filepath.Join(appDir, "docker-compose.yml")
-	if err := os.WriteFile(composePath, []byte(content), 0o644); err != nil {
-		return fmt.Errorf("failed to write docker-compose.yml: %w", err)
+	m.log.Debug("validating docker-compose file", "path", appDir)
+
+	for _, fileName := range composeFileNames {
+		filePath := filepath.Join(appDir, fileName)
+		if _, err := os.Stat(filePath); err == nil {
+			m.log.Debug("found valid docker-compose file", "path", filePath)
+			return nil
+		} else if !os.IsNotExist(err) {
+			m.log.Warn("error checking compose file", "path", filePath, "error", err)
+		}
 	}
 
-	m.log.Debug("docker-compose.yml written", "app_id", appID, "path", composePath)
-	return nil
+	return fmt.Errorf(
+		"no valid docker-compose file found in %s. Expected one of: %s",
+		appDir, strings.Join(composeFileNames, ", "),
+	)
 }
 
 func (m *Manager) WriteEnvFile(appID int64, envVars map[string]string) error {

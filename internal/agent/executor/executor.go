@@ -110,13 +110,12 @@ func (e *Executor) executeDeployApp(ctx context.Context, job *domain.Job) (strin
 		}
 	}
 
-	// FIX: check if repo has docker-compose.yml, if not exists then return error
-	// logs.WriteString("Step 2: Writing docker-compose.yml...\n")
-	// if err := e.docker.WriteDockerComposeFile(appID, payload.DockerComposeRaw); err != nil {
-	// 	logs.WriteString(fmt.Sprintf("❌ Failed to write compose file: %v\n", err))
-	// 	return logs.String(), err
-	// }
-	// logs.WriteString("✓ Compose file written\n\n")
+	logs.WriteString("Step 2: Validating compose file...\n")
+	if err := e.docker.ValidateDockerComposeFile(appID); err != nil {
+		logs.WriteString(fmt.Sprintf("❌ Failed to validate compose file: %v\n", err))
+		return logs.String(), err
+	}
+	logs.WriteString("✓ Compose file validated\n\n")
 
 	if len(payload.EnvVars) > 0 {
 		logs.WriteString(fmt.Sprintf("Step 3: Writing environment variables (%d vars)...\n", len(payload.EnvVars)))
