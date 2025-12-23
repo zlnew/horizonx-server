@@ -6,7 +6,8 @@ type JobCommandPayload struct {
 
 type DeployAppPayload struct {
 	ApplicationID int64             `json:"application_id"`
-	RepoURL       *string           `json:"repo_url"`
+	DeploymentID  int64             `json:"deployment_id"`
+	RepoURL       string            `json:"repo_url"`
 	Branch        string            `json:"branch"`
 	EnvVars       map[string]string `json:"env_vars,omitempty"`
 }

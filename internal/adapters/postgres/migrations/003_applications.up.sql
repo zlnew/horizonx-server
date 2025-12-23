@@ -5,7 +5,7 @@ CREATE TABLE IF NOT EXISTS applications (
     repo_url VARCHAR(255),
     branch VARCHAR(100) DEFAULT 'main',
 
-    status VARCHAR(20) DEFAULT 'stopped' CHECK (status IN ('stopped', 'starting', 'running', 'restarting', 'failed')),
+    status VARCHAR(20) DEFAULT 'stopped',
     last_deployment_at TIMESTAMPTZ,
 
     created_at TIMESTAMPTZ DEFAULT NOW(),

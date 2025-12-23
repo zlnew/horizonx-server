@@ -27,6 +27,7 @@ func (r *JobRepository) List(ctx context.Context) ([]domain.Job, error) {
 			application_id,
 			deployment_id,
 			job_type,
+			command_payload,
 			status,
 			output_log,
 			queued_at,
@@ -52,6 +53,7 @@ func (r *JobRepository) List(ctx context.Context) ([]domain.Job, error) {
 			&j.ApplicationID,
 			&j.DeploymentID,
 			&j.JobType,
+			&j.CommandPayload,
 			&j.Status,
 			&j.OutputLog,
 			&j.QueuedAt,
@@ -117,8 +119,8 @@ func (r *JobRepository) GetByID(ctx context.Context, jobID int64) (*domain.Job, 
 func (r *JobRepository) Create(ctx context.Context, j *domain.Job) (*domain.Job, error) {
 	query := `
 		INSERT INTO server_jobs
-		(server_id, application_id, deployment_id, job_type)
-		VALUES ($1, $2, $3, $4)
+		(server_id, application_id, deployment_id, job_type, command_payload)
+		VALUES ($1, $2, $3, $4, $5)
 		RETURNING id, queued_at
 	`
 
@@ -127,6 +129,7 @@ func (r *JobRepository) Create(ctx context.Context, j *domain.Job) (*domain.Job,
 		j.ApplicationID,
 		j.DeploymentID,
 		j.JobType,
+		j.CommandPayload,
 	).Scan(
 		&j.ID,
 		&j.QueuedAt,

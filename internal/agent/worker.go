@@ -124,17 +124,7 @@ func (w *JobWorker) processJob(ctx context.Context, job domain.Job) error {
 		return err
 	}
 
-	var deploymentID *int64
-	if job.JobType == domain.JobTypeDeployApp {
-		if payload, ok := job.CommandPayload.(map[string]any); ok {
-			if id, ok := payload["deployment_id"].(float64); ok {
-				idInt := int64(id)
-				deploymentID = &idInt
-			}
-		}
-	}
-
-	output, execErr := w.executeWithLogStreaming(ctx, &job, deploymentID)
+	output, execErr := w.executeWithLogStreaming(ctx, &job)
 
 	status := domain.JobSuccess
 	if execErr != nil {
@@ -153,23 +143,20 @@ func (w *JobWorker) processJob(ctx context.Context, job domain.Job) error {
 	return execErr
 }
 
-func (w *JobWorker) executeWithLogStreaming(ctx context.Context, job *domain.Job, deploymentID *int64) (string, error) {
-	if job.JobType == domain.JobTypeDeployApp && deploymentID != nil {
-		sendLog := func(chunk string) {
-			w.sendDeploymentLogs(ctx, *deploymentID, chunk)
+func (w *JobWorker) executeWithLogStreaming(ctx context.Context, job *domain.Job) (string, error) {
+	var handler *executor.ExecuteHandler
+	if job.JobType == domain.JobTypeDeployApp {
+		handler = &executor.ExecuteHandler{
+			SendLog: func(chunk string) {
+				w.sendDeploymentLogs(ctx, *job.DeploymentID, chunk)
+			},
+			SendCommitInfo: func(commitHash string, commitMessage string) {
+				w.sendCommitInfo(ctx, *job.DeploymentID, commitHash, commitMessage)
+			},
 		}
-
-		sendCommitInfo := func(commitHash, commitMessage string) {
-			w.sendCommitInfo(ctx, *deploymentID, commitHash, commitMessage)
-		}
-
-		return w.executor.Execute(ctx, job, &executor.ExecuteHandler{
-			SendLog:        sendLog,
-			SendCommitInfo: sendCommitInfo,
-		})
 	}
 
-	return w.executor.Execute(ctx, job, nil)
+	return w.executor.Execute(ctx, job, handler)
 }
 
 func (w *JobWorker) sendCommitInfo(ctx context.Context, deploymentID int64, commitHash string, commitMessage string) {

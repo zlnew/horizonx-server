@@ -3,6 +3,7 @@ package application
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 
 	"horizonx-server/internal/domain"
@@ -151,15 +152,15 @@ func (s *Service) UpdateLastDeployment(ctx context.Context, appID int64) error {
 // ACTIONS (Job-based)
 // ============================================================================
 
-func (s *Service) Deploy(ctx context.Context, appID int64, deployedBy int64) error {
+func (s *Service) Deploy(ctx context.Context, appID int64, deployedBy int64) (*domain.Deployment, error) {
 	app, err := s.repo.GetByID(ctx, appID)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	envVars, err := s.repo.ListEnvVars(ctx, appID)
 	if err != nil {
-		return fmt.Errorf("failed to fetch env vars: %w", err)
+		return nil, fmt.Errorf("failed to fetch env vars: %w", err)
 	}
 
 	envMap := make(map[string]string)
@@ -173,29 +174,36 @@ func (s *Service) Deploy(ctx context.Context, appID int64, deployedBy int64) err
 		DeployedBy:    &deployedBy,
 	})
 	if err != nil {
-		return fmt.Errorf("failed to create deployment record: %w", err)
+		return nil, fmt.Errorf("failed to create deployment record: %w", err)
+	}
+
+	payload := domain.DeployAppPayload{
+		ApplicationID: appID,
+		DeploymentID:  deployment.ID,
+		RepoURL:       app.RepoURL,
+		Branch:        app.Branch,
+		EnvVars:       envMap,
+	}
+
+	payloadBytes, err := json.Marshal(payload)
+	if err != nil {
+		return nil, err
 	}
 
 	job := &domain.Job{
-		ServerID:      app.ServerID,
-		ApplicationID: &appID,
-		DeploymentID:  &deployment.ID,
-		JobType:       domain.JobTypeDeployApp,
-		CommandPayload: map[string]any{
-			"application_id": appID,
-			"deployment_id":  deployment.ID,
-			"repo_url":       app.RepoURL,
-			"branch":         app.Branch,
-			"env_vars":       envMap,
-		},
+		ServerID:       app.ServerID,
+		ApplicationID:  &appID,
+		DeploymentID:   &deployment.ID,
+		JobType:        domain.JobTypeDeployApp,
+		CommandPayload: payloadBytes,
 	}
 
 	if _, err := s.jobSvc.Create(ctx, job); err != nil {
 		s.repo.UpdateStatus(ctx, appID, domain.AppStatusFailed)
-		return fmt.Errorf("failed to create deployment job: %w", err)
+		return nil, fmt.Errorf("failed to create deployment job: %w", err)
 	}
 
-	return nil
+	return deployment, nil
 }
 
 func (s *Service) Start(ctx context.Context, appID int64) error {
@@ -212,13 +220,20 @@ func (s *Service) Start(ctx context.Context, appID int64) error {
 		return err
 	}
 
+	payload := domain.StartAppPayload{
+		ApplicationID: appID,
+	}
+
+	payloadBytes, err := json.Marshal(payload)
+	if err != nil {
+		return err
+	}
+
 	job := &domain.Job{
-		ServerID:      app.ServerID,
-		ApplicationID: &appID,
-		JobType:       domain.JobTypeStartApp,
-		CommandPayload: map[string]any{
-			"application_id": appID,
-		},
+		ServerID:       app.ServerID,
+		ApplicationID:  &appID,
+		JobType:        domain.JobTypeStartApp,
+		CommandPayload: payloadBytes,
 	}
 
 	_, err = s.jobSvc.Create(ctx, job)
@@ -235,13 +250,20 @@ func (s *Service) Stop(ctx context.Context, appID int64) error {
 		return fmt.Errorf("application is already stopped")
 	}
 
+	payload := domain.StopAppPayload{
+		ApplicationID: appID,
+	}
+
+	payloadBytes, err := json.Marshal(payload)
+	if err != nil {
+		return err
+	}
+
 	job := &domain.Job{
-		ServerID:      app.ServerID,
-		ApplicationID: &appID,
-		JobType:       domain.JobTypeStopApp,
-		CommandPayload: map[string]any{
-			"application_id": appID,
-		},
+		ServerID:       app.ServerID,
+		ApplicationID:  &appID,
+		JobType:        domain.JobTypeStopApp,
+		CommandPayload: payloadBytes,
 	}
 
 	_, err = s.jobSvc.Create(ctx, job)
@@ -258,13 +280,20 @@ func (s *Service) Restart(ctx context.Context, appID int64) error {
 		return err
 	}
 
+	payload := domain.RestartAppPayload{
+		ApplicationID: appID,
+	}
+
+	payloadBytes, err := json.Marshal(payload)
+	if err != nil {
+		return err
+	}
+
 	job := &domain.Job{
-		ServerID:      app.ServerID,
-		ApplicationID: &appID,
-		JobType:       domain.JobTypeRestartApp,
-		CommandPayload: map[string]any{
-			"application_id": appID,
-		},
+		ServerID:       app.ServerID,
+		ApplicationID:  &appID,
+		JobType:        domain.JobTypeRestartApp,
+		CommandPayload: payloadBytes,
 	}
 
 	_, err = s.jobSvc.Create(ctx, job)

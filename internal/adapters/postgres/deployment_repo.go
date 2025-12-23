@@ -26,11 +26,11 @@ func (r *DeploymentRepository) List(ctx context.Context, appID int64, limit int)
 	}
 
 	query := `
-		SELECT id, application_id, commit_hash, commit_message, status, 
-		       build_logs, started_at, finished_at
+		SELECT id, application_id, branch, commit_hash, commit_message, status,
+					build_logs, deployed_by, triggered_at, started_at, finished_at
 		FROM deployments
 		WHERE application_id = $1
-		ORDER BY started_at DESC
+		ORDER BY triggered_at DESC
 		LIMIT $2
 	`
 
@@ -46,10 +46,13 @@ func (r *DeploymentRepository) List(ctx context.Context, appID int64, limit int)
 		err := rows.Scan(
 			&d.ID,
 			&d.ApplicationID,
+			&d.Branch,
 			&d.CommitHash,
 			&d.CommitMessage,
 			&d.Status,
 			&d.BuildLogs,
+			&d.DeployedBy,
+			&d.TriggeredAt,
 			&d.StartedAt,
 			&d.FinishedAt,
 		)
@@ -64,8 +67,8 @@ func (r *DeploymentRepository) List(ctx context.Context, appID int64, limit int)
 
 func (r *DeploymentRepository) GetByID(ctx context.Context, deploymentID int64) (*domain.Deployment, error) {
 	query := `
-		SELECT id, application_id, commit_hash, commit_message, status, 
-		       build_logs, started_at, finished_at
+		SELECT id, application_id, branch, commit_hash, commit_message, status, 
+		       build_logs, deployed_by, triggered_at, started_at, finished_at
 		FROM deployments
 		WHERE id = $1
 	`
@@ -74,10 +77,13 @@ func (r *DeploymentRepository) GetByID(ctx context.Context, deploymentID int64) 
 	err := r.db.QueryRow(ctx, query, deploymentID).Scan(
 		&d.ID,
 		&d.ApplicationID,
+		&d.Branch,
 		&d.CommitHash,
 		&d.CommitMessage,
 		&d.Status,
 		&d.BuildLogs,
+		&d.DeployedBy,
+		&d.TriggeredAt,
 		&d.StartedAt,
 		&d.FinishedAt,
 	)
@@ -98,13 +104,14 @@ func (r *DeploymentRepository) Create(ctx context.Context, deployment *domain.De
 		RETURNING id, triggered_at
 	`
 
+	now := time.Now().UTC()
 	err := r.db.QueryRow(
 		ctx, query,
 		deployment.ApplicationID,
 		deployment.Branch,
 		deployment.DeployedBy,
 		domain.DeploymentPending,
-		deployment.TriggeredAt,
+		now,
 	).Scan(&deployment.ID, &deployment.TriggeredAt)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create deployment: %w", err)
@@ -197,7 +204,7 @@ func (r *DeploymentRepository) UpdateLogs(ctx context.Context, deploymentID int6
 	if isPartial {
 		query = `
 			UPDATE deployments
-			SET build_logs = build_logs || $1
+			SET build_logs = COALESCE(build_logs, '') || $1
 			WHERE id = $2
 			RETURNING id, application_id, build_logs
 		`

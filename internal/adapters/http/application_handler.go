@@ -174,7 +174,8 @@ func (h *ApplicationHandler) Deploy(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := h.svc.Deploy(r.Context(), appID, userID); err != nil {
+	deployment, err := h.svc.Deploy(r.Context(), appID, userID)
+	if err != nil {
 		if errors.Is(err, domain.ErrApplicationNotFound) {
 			JSONError(w, http.StatusNotFound, "application not found")
 			return
@@ -185,6 +186,7 @@ func (h *ApplicationHandler) Deploy(w http.ResponseWriter, r *http.Request) {
 
 	JSONSuccess(w, http.StatusOK, APIResponse{
 		Message: "Deployment started",
+		Data:    deployment,
 	})
 }
 

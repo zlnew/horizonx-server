@@ -5,7 +5,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"path/filepath"
 	"strings"
 
 	"horizonx-server/internal/agent/docker"
@@ -72,69 +71,68 @@ func (e *Executor) Execute(ctx context.Context, job *domain.Job, handler *Execut
 }
 
 func (e *Executor) executeDeployApp(ctx context.Context, job *domain.Job, handler *ExecuteHandler) (string, error) {
-	if handler == nil || handler.SendLog == nil || handler.SendCommitInfo == nil {
+	if handler == nil {
 		return "", fmt.Errorf("missing required deployment handler")
 	}
 
 	var payload domain.DeployAppPayload
-	payloadBytes, err := json.Marshal(job.CommandPayload)
-	if err != nil {
-		return "", fmt.Errorf("failed to marshal payload: %w", err)
-	}
-	if err := json.Unmarshal(payloadBytes, &payload); err != nil {
-		return "", fmt.Errorf("failed to parse deploy payload: %w", err)
+	if err := json.Unmarshal(job.CommandPayload, &payload); err != nil {
+		return "", err
 	}
 
 	appID := payload.ApplicationID
 	var logs strings.Builder
 
+	// Start
 	deployingApplicationLog := fmt.Sprintf("=== Deploying Application %d ===\n\n", appID)
 	logs.WriteString(deployingApplicationLog)
 	handler.SendLog(deployingApplicationLog)
 
-	if payload.RepoURL != nil && *payload.RepoURL != "" {
-		fetchingSourceCodeLog := "Step 1: Fetching source code...\n"
-		logs.WriteString(fetchingSourceCodeLog)
-		handler.SendLog(fetchingSourceCodeLog)
+	// Fetching source code
+	fetchingSourceCodeLog := "Step 1: Fetching source code...\n"
+	logs.WriteString(fetchingSourceCodeLog)
+	handler.SendLog(fetchingSourceCodeLog)
 
-		repoDir := filepath.Join(e.docker.GetAppDir(appID), "source")
-		var gitOutput string
+	repoDir := e.docker.GetAppDir(appID)
+	var gitOutput string
+	var err error
 
-		if e.git.IsGitRepo(repoDir) {
-			e.log.Debug("repository exists, pulling latest", "app_id", appID)
-			gitOutput, err = e.git.Pull(ctx, repoDir, payload.Branch)
-		} else {
-			e.log.Debug("cloning repository", "app_id", appID, "repo", *payload.RepoURL)
-			gitOutput, err = e.git.Clone(ctx, *payload.RepoURL, payload.Branch, repoDir)
-		}
-
-		if err != nil {
-			gitOperationFailedLog := fmt.Sprintf("❌ Git operation failed: %v\n", err)
-			logs.WriteString(gitOperationFailedLog)
-			handler.SendLog(gitOperationFailedLog)
-			return logs.String(), err
-		}
-
-		sourceCodeReadyLog := fmt.Sprintf("%s ✓ Source code ready\n\n", gitOutput)
-		logs.WriteString(sourceCodeReadyLog)
-		handler.SendLog(sourceCodeReadyLog)
-
-		commitHash, _ := e.git.GetCurrentCommit(ctx, repoDir)
-		commitMsg, _ := e.git.GetCommitMessage(ctx, repoDir)
-		if commitHash != "" {
-			commitHashLog := fmt.Sprintf("Commit: %s\n", commitHash[:8])
-			commitMessageLog := fmt.Sprintf("Message: %s\n\n", commitMsg)
-
-			logs.WriteString(commitHashLog)
-			logs.WriteString(commitMessageLog)
-
-			handler.SendLog(commitHashLog)
-			handler.SendLog(commitMessageLog)
-
-			handler.SendCommitInfo(commitHash, commitMsg)
-		}
+	if e.git.IsGitRepo(repoDir) {
+		e.log.Debug("repository exists, pulling latest", "app_id", appID)
+		gitOutput, err = e.git.Pull(ctx, repoDir, payload.Branch)
+	} else {
+		e.log.Debug("cloning repository", "app_id", appID, "repo", payload.RepoURL)
+		gitOutput, err = e.git.Clone(ctx, payload.RepoURL, payload.Branch, repoDir)
 	}
 
+	if err != nil {
+		gitOperationFailedLog := fmt.Sprintf("❌ Git operation failed: %v\n", err)
+		logs.WriteString(gitOperationFailedLog)
+		handler.SendLog(gitOperationFailedLog)
+		return logs.String(), err
+	}
+
+	sourceCodeReadyLog := fmt.Sprintf("%s ✓ Source code ready\n\n", gitOutput)
+	logs.WriteString(sourceCodeReadyLog)
+	handler.SendLog(sourceCodeReadyLog)
+
+	// Get commit info
+	commitHash, _ := e.git.GetCurrentCommit(ctx, repoDir)
+	commitMsg, _ := e.git.GetCommitMessage(ctx, repoDir)
+	if commitHash != "" {
+		commitHashLog := fmt.Sprintf("Commit: %s\n", commitHash[:8])
+		commitMessageLog := fmt.Sprintf("Message: %s\n\n", commitMsg)
+
+		logs.WriteString(commitHashLog)
+		logs.WriteString(commitMessageLog)
+
+		handler.SendLog(commitHashLog)
+		handler.SendLog(commitMessageLog)
+
+		handler.SendCommitInfo(commitHash[:8], commitMsg)
+	}
+
+	// Validating compose file
 	logs.WriteString("Step 2: Validating compose file...\n")
 	if err := e.docker.ValidateDockerComposeFile(appID); err != nil {
 		failedToValidateComposeFileLog := fmt.Sprintf("❌ Failed to validate compose file: %v\n", err)
@@ -146,6 +144,7 @@ func (e *Executor) executeDeployApp(ctx context.Context, job *domain.Job, handle
 	logs.WriteString(composeFileValidatedLog)
 	handler.SendLog(composeFileValidatedLog)
 
+	// Writing environment variables
 	if len(payload.EnvVars) > 0 {
 		writingEnvVarsLog := fmt.Sprintf("Step 3: Writing environment variables (%d vars)...\n", len(payload.EnvVars))
 		logs.WriteString(writingEnvVarsLog)
@@ -161,6 +160,7 @@ func (e *Executor) executeDeployApp(ctx context.Context, job *domain.Job, handle
 		handler.SendLog(envConfiguredLog)
 	}
 
+	// Docker compose down
 	stoppingExistingContainersLog := "Step 4: Stopping existing containers...\n"
 	logs.WriteString(stoppingExistingContainersLog)
 	handler.SendLog(stoppingExistingContainersLog)
@@ -173,6 +173,7 @@ func (e *Executor) executeDeployApp(ctx context.Context, job *domain.Job, handle
 		handler.SendLog(stopOutput + "\n")
 	}
 
+	// Docker compose up
 	buildingAndStartingContainersLog := "Step 5: Building and starting containers...\n"
 	logs.WriteString(buildingAndStartingContainersLog)
 	handler.SendLog(buildingAndStartingContainersLog)
@@ -190,6 +191,7 @@ func (e *Executor) executeDeployApp(ctx context.Context, job *domain.Job, handle
 	logs.WriteString("✓ Containers started\n\n")
 	handler.SendLog("✓ Containers started\n\n")
 
+	// Verifying deployment
 	verifyingDeploymentLog := "Step 6: Verifying deployment...\n"
 	logs.WriteString(verifyingDeploymentLog)
 	handler.SendLog(verifyingDeploymentLog)
@@ -204,6 +206,7 @@ func (e *Executor) executeDeployApp(ctx context.Context, job *domain.Job, handle
 		handler.SendLog(warnLog)
 	}
 
+	// Finish
 	deploymentCompleteLog := "\n=== Deployment Complete ===\n"
 	logs.WriteString(deploymentCompleteLog)
 	handler.SendLog(deploymentCompleteLog)
@@ -212,12 +215,8 @@ func (e *Executor) executeDeployApp(ctx context.Context, job *domain.Job, handle
 
 func (e *Executor) executeStartApp(ctx context.Context, job *domain.Job) (string, error) {
 	var payload domain.StartAppPayload
-	payloadBytes, err := json.Marshal(job.CommandPayload)
-	if err != nil {
-		return "", fmt.Errorf("failed to marshal payload: %w", err)
-	}
-	if err := json.Unmarshal(payloadBytes, &payload); err != nil {
-		return "", fmt.Errorf("failed to parse start payload: %w", err)
+	if err := json.Unmarshal(job.CommandPayload, &payload); err != nil {
+		return "", err
 	}
 
 	appID := payload.ApplicationID
@@ -232,13 +231,9 @@ func (e *Executor) executeStartApp(ctx context.Context, job *domain.Job) (string
 }
 
 func (e *Executor) executeStopApp(ctx context.Context, job *domain.Job) (string, error) {
-	var payload domain.StopAppPayload
-	payloadBytes, err := json.Marshal(job.CommandPayload)
-	if err != nil {
-		return "", fmt.Errorf("failed to marshal payload: %w", err)
-	}
-	if err := json.Unmarshal(payloadBytes, &payload); err != nil {
-		return "", fmt.Errorf("failed to parse stop payload: %w", err)
+	var payload domain.StartAppPayload
+	if err := json.Unmarshal(job.CommandPayload, &payload); err != nil {
+		return "", err
 	}
 
 	appID := payload.ApplicationID
@@ -254,12 +249,8 @@ func (e *Executor) executeStopApp(ctx context.Context, job *domain.Job) (string,
 
 func (e *Executor) executeRestartApp(ctx context.Context, job *domain.Job) (string, error) {
 	var payload domain.RestartAppPayload
-	payloadBytes, err := json.Marshal(job.CommandPayload)
-	if err != nil {
-		return "", fmt.Errorf("failed to marshal payload: %w", err)
-	}
-	if err := json.Unmarshal(payloadBytes, &payload); err != nil {
-		return "", fmt.Errorf("failed to parse restart payload: %w", err)
+	if err := json.Unmarshal(job.CommandPayload, &payload); err != nil {
+		return "", err
 	}
 
 	appID := payload.ApplicationID

@@ -156,7 +156,7 @@ func (m *Manager) CleanupAppDir(appID int64) error {
 
 func (m *Manager) runDockerCommand(ctx context.Context, workDir string, args ...string) (string, error) {
 	cmd := exec.CommandContext(ctx, "docker", args...)
-	cmd.Dir = m.workDir
+	cmd.Dir = workDir
 
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout = &stdout

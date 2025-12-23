@@ -3,6 +3,7 @@ package middleware
 import (
 	"context"
 	"net/http"
+	"strconv"
 
 	"horizonx-server/internal/config"
 	"horizonx-server/internal/pkg"
@@ -34,6 +35,23 @@ func JWT(cfg *config.Config) func(http.Handler) http.Handler {
 }
 
 func GetUserID(ctx context.Context) (int64, bool) {
-	id, ok := ctx.Value(UserIDKey).(int64)
-	return id, ok
+	val := ctx.Value(UserIDKey)
+	if val == nil {
+		return 0, false
+	}
+
+	switch v := val.(type) {
+	case string:
+		id, err := strconv.ParseInt(v, 10, 64)
+		if err != nil {
+			return 0, false
+		}
+		return id, true
+	case int64:
+		return v, true
+	case float64:
+		return int64(v), true
+	default:
+		return 0, false
+	}
 }

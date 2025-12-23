@@ -5,7 +5,7 @@ CREATE TABLE IF NOT EXISTS server_jobs (
     deployment_id BIGINT,
     job_type VARCHAR(50) NOT NULL,
     command_payload JSONB,
-    status VARCHAR(20) DEFAULT 'queued' CHECK (status IN ('queued', 'running', 'success', 'failed', 'cancelled')),
+    status VARCHAR(20) DEFAULT 'queued',
     output_log TEXT,
 
     queued_at TIMESTAMPTZ DEFAULT NOW(),

@@ -4,7 +4,7 @@ CREATE TABLE IF NOT EXISTS deployments (
     branch VARCHAR(100) NOT NULL,
     commit_hash VARCHAR(40),
     commit_message TEXT,
-    status VARCHAR(20) NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'building', 'deploying', 'running', 'failed')),
+    status VARCHAR(20) NOT NULL DEFAULT 'pending',
     build_logs TEXT,
 
     deployed_by BIGINT,

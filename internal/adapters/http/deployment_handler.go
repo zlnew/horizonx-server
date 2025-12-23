@@ -97,12 +97,12 @@ func (h *DeploymentHandler) UpdateCommitInfo(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
-	if _, err := h.svc.GetByID(r.Context(), deploymentID); err != nil {
-		JSONError(w, http.StatusNotFound, "deployment not found")
-		return
-	}
-
 	if err := h.svc.UpdateCommitInfo(r.Context(), deploymentID, req.CommitHash, req.CommitMessage); err != nil {
+		if errors.Is(err, domain.ErrDeploymentNotFound) {
+			JSONError(w, http.StatusNotFound, "deployment not found")
+			return
+		}
+
 		JSONError(w, http.StatusInternalServerError, "failed to update commit info")
 		return
 	}
