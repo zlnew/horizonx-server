@@ -106,14 +106,7 @@ func (w *JobWorker) fetchJobs(ctx context.Context) ([]domain.Job, error) {
 		return nil, err
 	}
 
-	var pendingJobs []domain.Job
-	for _, job := range response.Data {
-		if job.Status == domain.JobQueued {
-			pendingJobs = append(pendingJobs, job)
-		}
-	}
-
-	return pendingJobs, nil
+	return response.Data, nil
 }
 
 func (w *JobWorker) processJob(ctx context.Context, job domain.Job) error {

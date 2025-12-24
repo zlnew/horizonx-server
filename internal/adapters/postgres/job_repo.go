@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 
 	"horizonx-server/internal/domain"
 
@@ -19,8 +20,8 @@ func NewJobRepository(db *pgxpool.Pool) domain.JobRepository {
 	return &JobRepository{db: db}
 }
 
-func (r *JobRepository) List(ctx context.Context) ([]domain.Job, error) {
-	query := `
+func (r *JobRepository) List(ctx context.Context, opts domain.JobListOptions) ([]*domain.Job, int64, error) {
+	baseQuery := `
 		SELECT
 			id,
 			server_id,
@@ -34,17 +35,126 @@ func (r *JobRepository) List(ctx context.Context) ([]domain.Job, error) {
 			started_at,
 			finished_at
 		FROM server_jobs
-		ORDER BY queued_at DESC
 	`
 
-	rows, err := r.db.Query(ctx, query)
+	args := []any{}
+	conditions := []string{}
+	argCounter := 1
+
+	if opts.ServerID != nil {
+		conditions = append(conditions, fmt.Sprintf("server_id = $%d", argCounter))
+		args = append(args, *opts.ServerID)
+		argCounter++
+	}
+
+	if opts.ApplicationID != nil {
+		conditions = append(conditions, fmt.Sprintf("application_id = $%d", argCounter))
+		args = append(args, *opts.ApplicationID)
+		argCounter++
+	}
+
+	if opts.DeploymentID != nil {
+		conditions = append(conditions, fmt.Sprintf("deployment_id = $%d", argCounter))
+		args = append(args, *opts.DeploymentID)
+		argCounter++
+	}
+
+	if opts.JobType != "" {
+		conditions = append(conditions, fmt.Sprintf("job_type = $%d", argCounter))
+		args = append(args, opts.JobType)
+		argCounter++
+	}
+
+	if len(opts.Statuses) > 0 {
+		placeholders := []string{}
+		for _, s := range opts.Statuses {
+			placeholders = append(placeholders, fmt.Sprintf("$%d", argCounter))
+			args = append(args, s)
+			argCounter++
+		}
+		conditions = append(conditions, fmt.Sprintf("status IN (%s)", strings.Join(placeholders, ", ")))
+	}
+
+	if len(conditions) > 0 {
+		baseQuery += " WHERE " + strings.Join(conditions, " AND ")
+	}
+
+	baseQuery += " ORDER BY queued_at DESC"
+
+	var total int64
+	if opts.IsPaginate {
+		countQuery := "SELECT COUNT(*) FROM server_jobs"
+		if len(conditions) > 0 {
+			countQuery += " WHERE " + strings.Join(conditions, " AND ")
+		}
+		if err := r.db.QueryRow(ctx, countQuery, args...).Scan(&total); err != nil {
+			return nil, 0, fmt.Errorf("failed to count jobs: %w", err)
+		}
+
+		offset := (opts.Page - 1) * opts.Limit
+		baseQuery += fmt.Sprintf(" LIMIT $%d OFFSET $%d", argCounter, argCounter+1)
+		args = append(args, opts.Limit, offset)
+	} else {
+		baseQuery += " LIMIT 1000"
+	}
+
+	rows, err := r.db.Query(ctx, baseQuery, args...)
 	if err != nil {
-		return nil, err
+		return nil, 0, fmt.Errorf("failed to query jobs: %w", err)
 	}
 	defer rows.Close()
 
-	var jobs []domain.Job
+	var jobs []*domain.Job
+	for rows.Next() {
+		var job domain.Job
+		if err := rows.Scan(
+			&job.ID,
+			&job.ServerID,
+			&job.ApplicationID,
+			&job.DeploymentID,
+			&job.JobType,
+			&job.CommandPayload,
+			&job.Status,
+			&job.OutputLog,
+			&job.QueuedAt,
+			&job.StartedAt,
+			&job.FinishedAt,
+		); err != nil {
+			return nil, 0, fmt.Errorf("failed to scan jobs: %w", err)
+		}
+		jobs = append(jobs, &job)
+	}
 
+	if err := rows.Err(); err != nil {
+		return nil, 0, err
+	}
+
+	return jobs, total, nil
+}
+
+func (r *JobRepository) GetPending(ctx context.Context) ([]*domain.Job, error) {
+	query := `
+		SELECT
+			id,
+			server_id,
+			application_id,
+			deployment_id,
+			job_type,
+			command_payload,
+			status,
+			queued_at
+		FROM server_jobs
+		WHERE status = $1
+		ORDER BY queued_at ASC
+		LIMIT 30
+	`
+
+	rows, err := r.db.Query(ctx, query, domain.JobQueued)
+	if err != nil {
+		return nil, err
+	}
+
+	var jobs []*domain.Job
 	for rows.Next() {
 		var j domain.Job
 		if err := rows.Scan(
@@ -55,15 +165,12 @@ func (r *JobRepository) List(ctx context.Context) ([]domain.Job, error) {
 			&j.JobType,
 			&j.CommandPayload,
 			&j.Status,
-			&j.OutputLog,
 			&j.QueuedAt,
-			&j.StartedAt,
-			&j.FinishedAt,
 		); err != nil {
 			return nil, err
 		}
 
-		jobs = append(jobs, j)
+		jobs = append(jobs, &j)
 	}
 
 	if err := rows.Err(); err != nil {

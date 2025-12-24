@@ -20,8 +20,35 @@ func NewService(repo domain.JobRepository, events *event.Bus) domain.JobService 
 	}
 }
 
-func (s *JobService) Get(ctx context.Context) ([]domain.Job, error) {
-	return s.repo.List(ctx)
+func (s *JobService) Get(ctx context.Context, opts domain.JobListOptions) (*domain.ListResult[*domain.Job], error) {
+	if opts.IsPaginate {
+		if opts.Page <= 0 {
+			opts.Page = 1
+		}
+		if opts.Limit <= 0 {
+			opts.Limit = 10
+		}
+	}
+
+	jobs, total, err := s.repo.List(ctx, opts)
+	if err != nil {
+		return nil, err
+	}
+
+	res := &domain.ListResult[*domain.Job]{
+		Data: jobs,
+		Meta: nil,
+	}
+
+	if opts.IsPaginate {
+		res.Meta = domain.CalculateMeta(total, opts.Page, opts.Limit)
+	}
+
+	return res, nil
+}
+
+func (s *JobService) GetPending(ctx context.Context) ([]*domain.Job, error) {
+	return s.repo.GetPending(ctx)
 }
 
 func (s *JobService) GetByID(ctx context.Context, jobID int64) (*domain.Job, error) {
