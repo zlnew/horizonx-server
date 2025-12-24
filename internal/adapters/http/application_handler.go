@@ -207,7 +207,7 @@ func (h *ApplicationHandler) Start(w http.ResponseWriter, r *http.Request) {
 	}
 
 	JSONSuccess(w, http.StatusOK, APIResponse{
-		Message: "Application starting",
+		Message: "Starting application",
 	})
 }
 
@@ -228,7 +228,7 @@ func (h *ApplicationHandler) Stop(w http.ResponseWriter, r *http.Request) {
 	}
 
 	JSONSuccess(w, http.StatusOK, APIResponse{
-		Message: "Application stopping",
+		Message: "Stopping application",
 	})
 }
 
@@ -249,7 +249,7 @@ func (h *ApplicationHandler) Restart(w http.ResponseWriter, r *http.Request) {
 	}
 
 	JSONSuccess(w, http.StatusOK, APIResponse{
-		Message: "Application restarting",
+		Message: "Restarting application",
 	})
 }
 
