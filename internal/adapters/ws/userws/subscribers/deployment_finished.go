@@ -26,4 +26,10 @@ func (s *DeploymentFinished) Handle(event any) {
 		Event:   "deployment_finished",
 		Payload: evt,
 	})
+
+	s.hub.Broadcast(&domain.WsServerEvent{
+		Channel: "deployments",
+		Event:   "deployment_finished",
+		Payload: evt,
+	})
 }

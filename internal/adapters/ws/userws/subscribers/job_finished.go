@@ -26,4 +26,10 @@ func (s *JobFinished) Handle(event any) {
 		Event:   "job_finished",
 		Payload: evt,
 	})
+
+	s.hub.Broadcast(&domain.WsServerEvent{
+		Channel: "jobs",
+		Event:   "job_finished",
+		Payload: evt,
+	})
 }
