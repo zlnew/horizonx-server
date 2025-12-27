@@ -10,6 +10,8 @@ import (
 	"os/exec"
 	"strings"
 	"sync"
+
+	"horizonx-server/internal/domain"
 )
 
 const (
@@ -17,7 +19,7 @@ const (
 	maxScannerBufferSize     = 10 * 1024 * 1024
 )
 
-type StreamHandler = func(line string, isErr bool)
+type StreamHandler = func(line string, stream domain.LogStream, level domain.LogLevel)
 
 type Command struct {
 	workDir string
@@ -36,13 +38,13 @@ func NewCommand(workDir, name string, args ...string) *Command {
 func (c *Command) Run(ctx context.Context, handlers ...StreamHandler) (string, error) {
 	var buf bytes.Buffer
 
-	err := c.execute(ctx, func(line string, isErr bool) {
+	err := c.execute(ctx, func(line string, stream domain.LogStream, level domain.LogLevel) {
 		buf.WriteString(line)
 		buf.WriteString("\n")
 
 		for _, h := range handlers {
 			if h != nil {
-				h(line, isErr)
+				h(line, stream, level)
 			}
 		}
 	})
@@ -50,7 +52,7 @@ func (c *Command) Run(ctx context.Context, handlers ...StreamHandler) (string, e
 	return buf.String(), err
 }
 
-func (c *Command) execute(ctx context.Context, onStream StreamHandler) error {
+func (c *Command) execute(ctx context.Context, handler StreamHandler) error {
 	cmd := exec.CommandContext(ctx, c.name, c.args...)
 	cmd.Dir = c.workDir
 
@@ -75,18 +77,19 @@ func (c *Command) execute(ctx context.Context, onStream StreamHandler) error {
 
 	go func() {
 		defer wg.Done()
-		if err := c.streamOutput(stdout, onStream, false); err != nil {
+		if err := c.streamOutput(stdout, handler, domain.StreamStdout); err != nil {
 			errChan <- fmt.Errorf("stdout stream error: %w", err)
 		}
 	}()
 
 	go func() {
 		defer wg.Done()
-		if err := c.streamOutput(stderr, onStream, true); err != nil {
+		if err := c.streamOutput(stderr, handler, domain.StreamStderr); err != nil {
 			errChan <- fmt.Errorf("stderr stream error: %w", err)
 		}
 	}()
 
+	cmdErr := cmd.Wait()
 	wg.Wait()
 	close(errChan)
 
@@ -94,8 +97,6 @@ func (c *Command) execute(ctx context.Context, onStream StreamHandler) error {
 	for err := range errChan {
 		streamErrs = append(streamErrs, err)
 	}
-
-	cmdErr := cmd.Wait()
 
 	if cmdErr != nil {
 		return fmt.Errorf("command failed: %w", cmdErr)
@@ -108,9 +109,9 @@ func (c *Command) execute(ctx context.Context, onStream StreamHandler) error {
 	return nil
 }
 
-func (c *Command) streamOutput(r io.Reader, handler StreamHandler, isErr bool) error {
+func (c *Command) streamOutput(r io.Reader, handler StreamHandler, stream domain.LogStream) error {
 	if handler == nil {
-		handler = func(string, bool) {}
+		handler = func(string, domain.LogStream, domain.LogLevel) {}
 	}
 
 	scanner := bufio.NewScanner(r)
@@ -122,14 +123,14 @@ func (c *Command) streamOutput(r io.Reader, handler StreamHandler, isErr bool) e
 
 		for _, line := range lines {
 			line = strings.TrimSpace(line)
+			level := c.classifyLine(line)
 			if line != "" {
-				handler(line, isErr)
+				handler(line, stream, level)
 			}
 		}
 	}
 
 	if err := scanner.Err(); err != nil {
-		handler(fmt.Sprintf("scanner error: %v", err), true)
 		return fmt.Errorf("scanner error: %w", err)
 	}
 
@@ -141,4 +142,29 @@ func (c *Command) normalizeAndSplitLines(text string) []string {
 	text = strings.ReplaceAll(text, "\r", "\n")
 
 	return strings.Split(text, "\n")
+}
+
+func (c *Command) classifyLine(line string) domain.LogLevel {
+	l := strings.ToLower(line)
+
+	switch {
+	case strings.Contains(l, "panic"),
+		strings.Contains(l, "fatal"):
+		return domain.LogFatal
+
+	case strings.Contains(l, "error"),
+		strings.Contains(l, "failed"),
+		strings.Contains(l, "exception"):
+		return domain.LogError
+
+	case strings.Contains(l, "warn"),
+		strings.Contains(l, "deprecated"):
+		return domain.LogWarn
+
+	case strings.Contains(l, "debug"),
+		strings.Contains(l, "trace"):
+		return domain.LogDebug
+	}
+
+	return domain.LogInfo
 }

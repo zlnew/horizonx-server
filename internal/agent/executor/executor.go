@@ -62,25 +62,24 @@ func (e *Executor) Execute(ctx context.Context, job *domain.Job, onEmit EmitHand
 	}
 }
 
-func (e *Executor) emitLog(
-	level domain.LogLevel,
-	source domain.LogSource,
+func (e *Executor) emitLogHandler(
+	emit EmitHandler,
 	action domain.LogAction,
 	step domain.LogStep,
-	stream domain.LogStream,
-	line string,
-) domain.EventLogEmitted {
-	return domain.EventLogEmitted{
-		Timestamp: time.Now().UTC(),
-		Level:     level,
-		Source:    source,
-		Action:    action,
-		Message:   line,
-		Context: &domain.LogContext{
-			Step:   step,
-			Stream: stream,
-			Line:   line,
-		},
+) func(line string, stream domain.LogStream, level domain.LogLevel) {
+	return func(line string, stream domain.LogStream, level domain.LogLevel) {
+		emit(domain.EventLogEmitted{
+			Timestamp: time.Now().UTC(),
+			Level:     level,
+			Source:    domain.LogAgent,
+			Action:    action,
+			Message:   line,
+			Context: &domain.LogContext{
+				Step:   step,
+				Stream: stream,
+				Line:   line,
+			},
+		})
 	}
 }
 
@@ -91,20 +90,15 @@ func (e *Executor) deployApp(ctx context.Context, job *domain.Job, emit EmitHand
 	}
 
 	appID := payload.ApplicationID
-	source := domain.LogAgent
 	action := domain.ActionAppDeploy
 
 	// Git clone or pull
-	if _, err := e.git.CloneOrPull(ctx, appID, payload.RepoURL, payload.Branch, func(line string, isErr bool) {
-		level := domain.LogInfo
-		stream := domain.StreamStdout
-		if isErr {
-			level = domain.LogError
-			stream = domain.StreamStderr
-		}
-
-		emit(e.emitLog(level, source, action, domain.StepGitClone, stream, line))
-	}); err != nil {
+	if _, err := e.git.CloneOrPull(ctx, appID, payload.RepoURL, payload.Branch, e.emitLogHandler(
+		emit,
+		action,
+		domain.StepGitClone,
+	),
+	); err != nil {
 		return err
 	}
 
@@ -140,30 +134,21 @@ func (e *Executor) deployApp(ctx context.Context, job *domain.Job, emit EmitHand
 	}
 
 	// Docker compose down
-	if _, err := e.docker.ComposeDown(ctx, appID, false, func(line string, isErr bool) {
-		level := domain.LogInfo
-		stream := domain.StreamStdout
-		if isErr {
-			level = domain.LogError
-			stream = domain.StreamStderr
-		}
-
-		emit(e.emitLog(level, source, action, domain.StepDockerStop, stream, line))
-	}); err != nil {
+	if _, err := e.docker.ComposeDown(ctx, appID, false, e.emitLogHandler(
+		emit,
+		action,
+		domain.StepDockerStop,
+	),
+	); err != nil {
 		return err
 	}
 
 	// Docker compose up
-	if _, err := e.docker.ComposeUp(ctx, appID, true, true, func(line string, isErr bool) {
-		level := domain.LogInfo
-		stream := domain.StreamStdout
-		if isErr {
-			level = domain.LogError
-			stream = domain.StreamStderr
-		}
-
-		emit(e.emitLog(level, source, action, domain.StepDockerBuild, stream, line))
-	}); err != nil {
+	if _, err := e.docker.ComposeUp(ctx, appID, true, true, e.emitLogHandler(
+		emit,
+		action,
+		domain.StepDockerBuild,
+	)); err != nil {
 		return err
 	}
 
@@ -177,19 +162,12 @@ func (e *Executor) startApp(ctx context.Context, job *domain.Job, emit EmitHandl
 	}
 
 	appID := payload.ApplicationID
-	source := domain.LogAgent
-	action := domain.ActionAppStart
 
-	if _, err := e.docker.ComposeStart(ctx, appID, func(line string, isErr bool) {
-		level := domain.LogInfo
-		stream := domain.StreamStdout
-		if isErr {
-			level = domain.LogError
-			stream = domain.StreamStderr
-		}
-
-		emit(e.emitLog(level, source, action, domain.StepDockerStart, stream, line))
-	}); err != nil {
+	if _, err := e.docker.ComposeStart(ctx, appID, e.emitLogHandler(
+		emit,
+		domain.ActionAppStart,
+		domain.StepDockerStart,
+	)); err != nil {
 		return err
 	}
 
@@ -203,19 +181,12 @@ func (e *Executor) stopApp(ctx context.Context, job *domain.Job, emit EmitHandle
 	}
 
 	appID := payload.ApplicationID
-	source := domain.LogAgent
-	action := domain.ActionAppStop
 
-	if _, err := e.docker.ComposeStop(ctx, appID, func(line string, isErr bool) {
-		level := domain.LogInfo
-		stream := domain.StreamStdout
-		if isErr {
-			level = domain.LogError
-			stream = domain.StreamStderr
-		}
-
-		emit(e.emitLog(level, source, action, domain.StepDockerStop, stream, line))
-	}); err != nil {
+	if _, err := e.docker.ComposeStop(ctx, appID, e.emitLogHandler(
+		emit,
+		domain.ActionAppStop,
+		domain.StepDockerStop,
+	)); err != nil {
 		return err
 	}
 
@@ -229,19 +200,12 @@ func (e *Executor) restartApp(ctx context.Context, job *domain.Job, emit EmitHan
 	}
 
 	appID := payload.ApplicationID
-	source := domain.LogAgent
-	action := domain.ActionAppRestart
 
-	if _, err := e.docker.ComposeRestart(ctx, appID, func(line string, isErr bool) {
-		level := domain.LogInfo
-		stream := domain.StreamStdout
-		if isErr {
-			level = domain.LogError
-			stream = domain.StreamStderr
-		}
-
-		emit(e.emitLog(level, source, action, domain.StepDockerRestart, stream, line))
-	}); err != nil {
+	if _, err := e.docker.ComposeRestart(ctx, appID, e.emitLogHandler(
+		emit,
+		domain.ActionAppRestart,
+		domain.StepDockerRestart,
+	)); err != nil {
 		return err
 	}
 
