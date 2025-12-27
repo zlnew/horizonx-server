@@ -46,7 +46,7 @@ func (e *Executor) Initialize() error {
 }
 
 func (e *Executor) Execute(ctx context.Context, job *domain.Job, onEmit EmitHandler) error {
-	e.log.Info("executing job", "id", job.ID, "type", job.Type)
+	e.log.Info("executing job", "job_id", job.ID)
 
 	switch job.Type {
 	case domain.JobTypeAppDeploy:

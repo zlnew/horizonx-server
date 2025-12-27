@@ -63,7 +63,7 @@ func (r *MetricsReporter) Flush(ctx context.Context) error {
 	r.buffer = r.buffer[:0]
 	r.bufferMu.Unlock()
 
-	r.log.Info("flushing metrics batch", "size", len(batch))
+	r.log.Debug("flushing metrics batch", "size", len(batch))
 
 	return r.sendBatch(ctx, batch)
 }
@@ -111,7 +111,7 @@ func (r *MetricsReporter) sendBatch(ctx context.Context, batch []domain.Metrics)
 		resp.Body.Close()
 
 		if resp.StatusCode >= 200 && resp.StatusCode < 300 {
-			r.log.Info("metrics sent successfully", "count", len(batch), "status", resp.StatusCode)
+			r.log.Debug("metrics sent successfully", "count", len(batch), "status", resp.StatusCode)
 			return nil
 		}
 

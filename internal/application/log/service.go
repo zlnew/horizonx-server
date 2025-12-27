@@ -62,7 +62,7 @@ func (s *LogService) Emit(ctx context.Context, l *domain.Log) (*domain.Log, erro
 	}
 
 	if s.bus != nil {
-		s.bus.Publish("log_received", l)
+		s.bus.Publish("log_received", log)
 	}
 
 	return log, nil

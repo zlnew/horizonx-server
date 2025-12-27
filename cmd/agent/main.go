@@ -32,7 +32,7 @@ func main() {
 		log.Fatal("FATAL: HORIZONX_SERVER_ID is missing or invalid in .env!")
 	}
 
-	appLog.Info("HorizonX Agent: starting...", "server_id", cfg.AgentServerID)
+	appLog.Info("horizonx agent: starting...", "server_id", cfg.AgentServerID)
 
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()

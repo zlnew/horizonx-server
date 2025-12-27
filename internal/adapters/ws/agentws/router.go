@@ -37,7 +37,7 @@ func (r *Router) Run() {
 	for {
 		select {
 		case <-r.ctx.Done():
-			r.log.Info("ws: agent hub shutting down...")
+			r.log.Info("ws: agent router shutting down...")
 			for _, agent := range r.agents {
 				close(agent.send)
 			}

@@ -26,6 +26,8 @@ type Service struct {
 
 	flushInterval time.Duration
 	maxBatchSize  int
+
+	flushMu sync.Mutex
 }
 
 func NewService(repo domain.MetricsRepository, bus *event.Bus, log logger.Logger) domain.MetricsService {
@@ -58,7 +60,7 @@ func (s *Service) Ingest(m domain.Metrics) error {
 
 	if bufferSize >= s.maxBatchSize {
 		s.log.Debug("buffer size reached, forcing flush", "size", bufferSize)
-		go s.flush()
+		go s.safeFlush()
 	}
 
 	if s.bus != nil {
@@ -82,8 +84,17 @@ func (s *Service) backgroundFlusher() {
 	defer ticker.Stop()
 
 	for range ticker.C {
-		s.flush()
+		s.safeFlush()
 	}
+}
+
+func (s *Service) safeFlush() {
+	if !s.flushMu.TryLock() {
+		return
+	}
+	defer s.flushMu.Unlock()
+
+	s.flush()
 }
 
 func (s *Service) flush() {
@@ -98,7 +109,7 @@ func (s *Service) flush() {
 	s.buffer = s.buffer[:0]
 	s.bufferMu.Unlock()
 
-	s.log.Info("flushing metrics to database", "count", len(batch))
+	s.log.Debug("flushing metrics to database", "count", len(batch))
 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()

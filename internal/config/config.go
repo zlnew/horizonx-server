@@ -25,7 +25,6 @@ type Config struct {
 	AgentServerID               uuid.UUID
 	AgentMetricsCollectInterval time.Duration
 	AgentMetricsFlushInterval   time.Duration
-	AgentHeartbeatInterval      time.Duration
 	AgentLogLevel               string
 	AgentLogFormat              string
 }
@@ -90,12 +89,6 @@ func Load() *Config {
 			agentMetricsFlushInterval = duration
 		}
 	}
-	agentHeartbeatInterval := 30 * time.Second
-	if raw := os.Getenv("AGENT_HEARTBEAT_INTERVAL"); raw != "" {
-		if duration, err := time.ParseDuration(raw); err == nil && duration > 0 {
-			agentHeartbeatInterval = duration
-		}
-	}
 
 	// AGENT Logs
 	agentLogLevel := getEnv("AGENT_LOG_LEVEL", "info")
@@ -116,7 +109,6 @@ func Load() *Config {
 		AgentServerID:               agentServerID,
 		AgentMetricsCollectInterval: agentMetricsCollectInterval,
 		AgentMetricsFlushInterval:   agentMetricsFlushInterval,
-		AgentHeartbeatInterval:      agentHeartbeatInterval,
 		AgentLogLevel:               agentLogLevel,
 		AgentLogFormat:              agentLogFormat,
 	}

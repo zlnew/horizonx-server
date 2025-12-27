@@ -75,7 +75,7 @@ func (w *JobWorker) pollAndExecuteJobs(ctx context.Context) error {
 }
 
 func (w *JobWorker) processJob(ctx context.Context, job domain.Job) error {
-	w.log.Info("processing job", "id", job.ID, "type", job.Type)
+	w.log.Info("processing job", "job_id", job.ID)
 
 	if err := w.client.StartJob(ctx, job.ID); err != nil {
 		w.log.Error("failed to mark job as running", "job_id", job.ID, "error", err)
