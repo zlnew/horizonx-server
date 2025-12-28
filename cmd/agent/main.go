@@ -5,7 +5,6 @@ import (
 	"log"
 	"os/signal"
 	"syscall"
-	"time"
 
 	"github.com/joho/godotenv"
 	"golang.org/x/sync/errgroup"
@@ -38,38 +37,31 @@ func main() {
 	defer stop()
 
 	// Initialize components
-	wsAgent := agent.NewAgent(cfg, appLog)
-	sampler := metrics.NewSampler(appLog)
-	sampler.SetServerID(cfg.AgentServerID)
-
-	reporter := agent.NewMetricsReporter(
-		cfg.AgentTargetAPIURL,
-		cfg.AgentServerID.String()+"."+cfg.AgentServerAPIToken,
-		appLog,
-	)
+	ws := agent.NewAgent(cfg, appLog)
+	mCollector := metrics.NewCollector(cfg, appLog)
 
 	// Initialize job worker
-	jobWorker := agent.NewJobWorker(cfg, appLog, "/var/horizonx/apps")
-	if err := jobWorker.Initialize(); err != nil {
+	jWorker := agent.NewJobWorker(cfg, appLog, mCollector.Latest)
+	if err := jWorker.Initialize(); err != nil {
 		appLog.Error("failed to Initialize job worker", "error", err)
 		log.Fatal(err)
 	}
 
 	g, gCtx := errgroup.WithContext(ctx)
 
-	// 1. WebSocket connection
+	// WebSocket connection
 	g.Go(func() error {
-		return wsAgent.Run(gCtx)
+		return ws.Run(gCtx)
 	})
 
-	// 2. Metrics collection and reporting
+	// Metrics collector
 	g.Go(func() error {
-		return runMetricsCollector(gCtx, cfg, sampler, reporter, appLog)
+		return mCollector.Start(gCtx)
 	})
 
-	// 3. Job worker
+	// Job worker
 	g.Go(func() error {
-		return jobWorker.Start(gCtx)
+		return jWorker.Start(gCtx)
 	})
 
 	if err := g.Wait(); err != nil && err != context.Canceled && !agent.IsFatalError(err) {
@@ -79,53 +71,4 @@ func main() {
 	}
 
 	appLog.Info("agent stopped gracefully.")
-}
-
-func runMetricsCollector(
-	ctx context.Context,
-	cfg *config.Config,
-	sampler *metrics.Sampler,
-	reporter *agent.MetricsReporter,
-	log logger.Logger,
-) error {
-	collectionTicker := time.NewTicker(cfg.AgentMetricsCollectInterval)
-	flushTicker := time.NewTicker(cfg.AgentMetricsFlushInterval)
-	defer collectionTicker.Stop()
-	defer flushTicker.Stop()
-
-	log.Info("metrics collector started",
-		"collection_interval", cfg.AgentMetricsCollectInterval,
-		"flush_interval", cfg.AgentMetricsFlushInterval,
-	)
-
-	for {
-		select {
-		case <-ctx.Done():
-			log.Info("flushing remaining metrics before shutdown...")
-			flushCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-			reporter.Flush(flushCtx)
-			cancel()
-			return ctx.Err()
-
-		case <-collectionTicker.C:
-			metrics := sampler.Collect(ctx)
-			metrics.RecordedAt = time.Now().UTC()
-
-			reporter.Add(metrics)
-
-			log.Debug("metrics collected", "buffer_size", reporter.BufferSize())
-
-			if reporter.ShouldFlush() {
-				log.Debug("buffer full, forcing flush")
-				if err := reporter.Flush(ctx); err != nil {
-					log.Error("failed to flush metrics", "error", err)
-				}
-			}
-
-		case <-flushTicker.C:
-			if err := reporter.Flush(ctx); err != nil {
-				log.Error("failed to flush metrics", "error", err)
-			}
-		}
-	}
 }

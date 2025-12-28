@@ -111,6 +111,35 @@ func (c *Client) FinishJob(ctx context.Context, jobID int64, status domain.JobSt
 	return nil
 }
 
+func (c *Client) SendMetrics(ctx context.Context, req *domain.Metrics) error {
+	url := fmt.Sprintf("%s/agent/metrics", c.cfg.AgentTargetAPIURL)
+
+	body, err := json.Marshal(&req)
+	if err != nil {
+		return err
+	}
+
+	httpReq, err := http.NewRequestWithContext(ctx, "POST", url, bytes.NewReader(body))
+	if err != nil {
+		return err
+	}
+
+	httpReq.Header.Set("Content-Type", "application/json")
+	httpReq.Header.Set("Authorization", "Bearer "+c.cfg.AgentServerID.String()+"."+c.cfg.AgentServerAPIToken)
+
+	resp, err := c.http.Do(httpReq)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusCreated {
+		return fmt.Errorf("failed to send metrics, status: %d", resp.StatusCode)
+	}
+
+	return nil
+}
+
 func (c *Client) SendLog(ctx context.Context, req *domain.LogEmitRequest) error {
 	url := fmt.Sprintf("%s/agent/logs", c.cfg.AgentTargetAPIURL)
 

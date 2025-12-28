@@ -2,10 +2,13 @@ package domain
 
 import (
 	"context"
+	"errors"
 	"time"
 
 	"github.com/google/uuid"
 )
+
+var ErrMetricsNotFound = errors.New("metrics not found")
 
 type Metrics struct {
 	ServerID      uuid.UUID     `json:"server_id"`
@@ -87,7 +90,7 @@ type MetricsPayload struct {
 
 type MetricsService interface {
 	Ingest(m Metrics) error
-	Latest(serverID uuid.UUID) (Metrics, bool)
+	Latest(serverID uuid.UUID) (*Metrics, error)
 }
 
 type MetricsRepository interface {

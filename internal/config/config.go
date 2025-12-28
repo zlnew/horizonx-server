@@ -3,6 +3,7 @@ package config
 
 import (
 	"os"
+	"strconv"
 	"strings"
 	"time"
 
@@ -19,14 +20,17 @@ type Config struct {
 	LogLevel       string
 	LogFormat      string
 
-	AgentTargetAPIURL           string
-	AgentTargetWsURL            string
-	AgentServerAPIToken         string
-	AgentServerID               uuid.UUID
-	AgentMetricsCollectInterval time.Duration
-	AgentMetricsFlushInterval   time.Duration
-	AgentLogLevel               string
-	AgentLogFormat              string
+	MetricsCollectInterval time.Duration
+	MetricsCleanupInterval time.Duration
+	MetricsFlushInterval   time.Duration
+	MetricsBatchSize       int
+
+	AgentTargetAPIURL   string
+	AgentTargetWsURL    string
+	AgentServerAPIToken string
+	AgentServerID       uuid.UUID
+	AgentLogLevel       string
+	AgentLogFormat      string
 }
 
 func Load() *Config {
@@ -63,6 +67,34 @@ func Load() *Config {
 	logLevel := getEnv("LOG_LEVEL", "info")
 	logFormat := getEnv("LOG_FORMAT", "text")
 
+	// Metrics
+	metricsCollectInterval := 10 * time.Second
+	metricsCleanupInterval := 24 * time.Hour
+	metricsFlushInterval := 5 * time.Second
+	metricsBatchSize := 20
+
+	if raw := getEnv("METRICS_COLLECT_INTERVAL", "10s"); raw != "" {
+		if duration, err := time.ParseDuration(raw); err == nil && duration > 0 {
+			metricsCollectInterval = duration
+		}
+	}
+
+	if raw := os.Getenv("METRICS_CLEANUP_INTERVAL"); raw != "" {
+		if duration, err := time.ParseDuration(raw); err == nil && duration > 0 {
+			metricsCleanupInterval = duration
+		}
+	}
+
+	if raw := os.Getenv("METRICS_FLUSH_INTERVAL"); raw != "" {
+		if duration, err := time.ParseDuration(raw); err == nil && duration > 0 {
+			metricsFlushInterval = duration
+		}
+	}
+
+	if value, err := strconv.ParseInt(os.Getenv("METRICS_BATCH_SIZE"), 10, 64); err == nil {
+		metricsBatchSize = int(value)
+	}
+
 	// AGENT Target URL
 	agentTargetAPIURL := getEnv("HORIZONX_API_URL", "http://localhost:3000")
 	agentTargetWsURL := getEnv("HORIZONX_WS_URL", "ws://localhost:3000/ws/agent")
@@ -73,20 +105,6 @@ func Load() *Config {
 	if raw := os.Getenv("HORIZONX_SERVER_ID"); raw != "" {
 		if serverID, err := uuid.Parse(raw); err == nil {
 			agentServerID = serverID
-		}
-	}
-
-	// AGENT Intervals
-	agentMetricsCollectInterval := 10 * time.Second
-	if raw := os.Getenv("AGENT_METRICS_COLLECT_INTERVAL"); raw != "" {
-		if duration, err := time.ParseDuration(raw); err == nil && duration > 0 {
-			agentMetricsCollectInterval = duration
-		}
-	}
-	agentMetricsFlushInterval := 10 * time.Second
-	if raw := os.Getenv("AGENT_METRICS_FLUSH_INTERVAL"); raw != "" {
-		if duration, err := time.ParseDuration(raw); err == nil && duration > 0 {
-			agentMetricsFlushInterval = duration
 		}
 	}
 
@@ -103,14 +121,17 @@ func Load() *Config {
 		LogLevel:       logLevel,
 		LogFormat:      logFormat,
 
-		AgentTargetAPIURL:           agentTargetAPIURL,
-		AgentTargetWsURL:            agentTargetWsURL,
-		AgentServerAPIToken:         agentServerAPIToken,
-		AgentServerID:               agentServerID,
-		AgentMetricsCollectInterval: agentMetricsCollectInterval,
-		AgentMetricsFlushInterval:   agentMetricsFlushInterval,
-		AgentLogLevel:               agentLogLevel,
-		AgentLogFormat:              agentLogFormat,
+		MetricsCollectInterval: metricsCollectInterval,
+		MetricsCleanupInterval: metricsCleanupInterval,
+		MetricsFlushInterval:   metricsFlushInterval,
+		MetricsBatchSize:       metricsBatchSize,
+
+		AgentTargetAPIURL:   agentTargetAPIURL,
+		AgentTargetWsURL:    agentTargetWsURL,
+		AgentServerAPIToken: agentServerAPIToken,
+		AgentServerID:       agentServerID,
+		AgentLogLevel:       agentLogLevel,
+		AgentLogFormat:      agentLogFormat,
 	}
 }
 

@@ -6,6 +6,7 @@ import (
 	"sync"
 	"time"
 
+	"horizonx-server/internal/config"
 	"horizonx-server/internal/domain"
 	"horizonx-server/internal/event"
 	"horizonx-server/internal/logger"
@@ -14,6 +15,7 @@ import (
 )
 
 type Service struct {
+	cfg  *config.Config
 	repo domain.MetricsRepository
 	bus  *event.Bus
 	log  logger.Logger
@@ -24,21 +26,17 @@ type Service struct {
 	latest   map[uuid.UUID]domain.Metrics
 	latestMu sync.Mutex
 
-	flushInterval time.Duration
-	maxBatchSize  int
-
 	flushMu sync.Mutex
 }
 
-func NewService(repo domain.MetricsRepository, bus *event.Bus, log logger.Logger) domain.MetricsService {
+func NewService(cfg *config.Config, repo domain.MetricsRepository, bus *event.Bus, log logger.Logger) domain.MetricsService {
 	svc := &Service{
-		repo:          repo,
-		bus:           bus,
-		log:           log,
-		buffer:        make([]domain.Metrics, 0, 100),
-		latest:        make(map[uuid.UUID]domain.Metrics),
-		flushInterval: 5 * time.Second,
-		maxBatchSize:  50,
+		cfg:    cfg,
+		repo:   repo,
+		bus:    bus,
+		log:    log,
+		buffer: make([]domain.Metrics, 0, 100),
+		latest: make(map[uuid.UUID]domain.Metrics),
 	}
 
 	go svc.backgroundFlusher()
@@ -58,7 +56,7 @@ func (s *Service) Ingest(m domain.Metrics) error {
 
 	s.log.Debug("metric added to buffer", "buffer_size", bufferSize)
 
-	if bufferSize >= s.maxBatchSize {
+	if bufferSize >= s.cfg.MetricsBatchSize {
 		s.log.Debug("buffer size reached, forcing flush", "size", bufferSize)
 		go s.safeFlush()
 	}
@@ -70,17 +68,20 @@ func (s *Service) Ingest(m domain.Metrics) error {
 	return nil
 }
 
-func (s *Service) Latest(serverID uuid.UUID) (domain.Metrics, bool) {
+func (s *Service) Latest(serverID uuid.UUID) (*domain.Metrics, error) {
 	s.latestMu.Lock()
 	defer s.latestMu.Unlock()
 
-	m, ok := s.latest[serverID]
+	metrics, ok := s.latest[serverID]
+	if !ok {
+		return nil, domain.ErrMetricsNotFound
+	}
 
-	return m, ok
+	return &metrics, nil
 }
 
 func (s *Service) backgroundFlusher() {
-	ticker := time.NewTicker(s.flushInterval)
+	ticker := time.NewTicker(s.cfg.MetricsFlushInterval)
 	defer ticker.Stop()
 
 	for range ticker.C {
@@ -104,9 +105,8 @@ func (s *Service) flush() {
 		return
 	}
 
-	batch := make([]domain.Metrics, len(s.buffer))
-	copy(batch, s.buffer)
-	s.buffer = s.buffer[:0]
+	batch := s.buffer
+	s.buffer = make([]domain.Metrics, 0, s.cfg.MetricsBatchSize)
 	s.bufferMu.Unlock()
 
 	s.log.Debug("flushing metrics to database", "count", len(batch))

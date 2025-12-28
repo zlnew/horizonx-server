@@ -3,7 +3,10 @@ package metrics
 
 import (
 	"context"
+	"sync"
+	"time"
 
+	"horizonx-server/internal/config"
 	"horizonx-server/internal/domain"
 	"horizonx-server/internal/logger"
 	"horizonx-server/internal/metrics/collector/cpu"
@@ -13,11 +16,9 @@ import (
 	"horizonx-server/internal/metrics/collector/network"
 	"horizonx-server/internal/metrics/collector/os"
 	"horizonx-server/internal/metrics/collector/uptime"
-
-	"github.com/google/uuid"
 )
 
-type Sampler struct {
+type Collector struct {
 	os      *os.Collector
 	cpu     *cpu.Collector
 	gpu     *gpu.Collector
@@ -25,13 +26,20 @@ type Sampler struct {
 	disk    *disk.Collector
 	network *network.Collector
 	uptime  *uptime.Collector
-	log     logger.Logger
 
-	serverID uuid.UUID
+	cfg *config.Config
+	log logger.Logger
+
+	buffer    []domain.Metrics
+	bufferMu  sync.Mutex
+	batchSize int
+	interval  time.Duration
 }
 
-func NewSampler(log logger.Logger) *Sampler {
-	return &Sampler{
+func NewCollector(cfg *config.Config, log logger.Logger) *Collector {
+	return &Collector{
+		cfg: cfg,
+
 		os:      os.NewCollector(log),
 		cpu:     cpu.NewCollector(log),
 		gpu:     gpu.NewCollector(log),
@@ -39,18 +47,46 @@ func NewSampler(log logger.Logger) *Sampler {
 		disk:    disk.NewCollector(log),
 		network: network.NewCollector(log),
 		uptime:  uptime.NewCollector(log),
-		log:     log,
+
+		log: log,
+
+		buffer:    make([]domain.Metrics, 0, 10),
+		batchSize: 10,
+		interval:  5 * time.Second,
 	}
 }
 
-func (s *Sampler) SetServerID(serverID uuid.UUID) {
-	s.serverID = serverID
+func (s *Collector) Start(ctx context.Context) error {
+	ticker := time.NewTicker(s.interval)
+	defer ticker.Stop()
+
+	s.log.Info("metrics collector started")
+
+	for {
+		select {
+		case <-ctx.Done():
+			s.log.Info("metrics collector stopping...")
+			return ctx.Err()
+		case <-ticker.C:
+			s.collect(ctx)
+		}
+	}
 }
 
-func (s *Sampler) Collect(ctx context.Context) domain.Metrics {
-	var metrics domain.Metrics
+func (s *Collector) Latest() domain.Metrics {
+	s.bufferMu.Lock()
+	defer s.bufferMu.Unlock()
 
-	metrics.ServerID = s.serverID
+	if len(s.buffer) == 0 {
+		return domain.Metrics{}
+	}
+	return s.buffer[len(s.buffer)-1]
+}
+
+func (s *Collector) collect(ctx context.Context) {
+	var metrics domain.Metrics
+	metrics.ServerID = s.cfg.AgentServerID
+	metrics.RecordedAt = time.Now().UTC()
 
 	if val, err := s.os.Collect(ctx); err != nil {
 		s.log.Error("collector", "name", "os", "error", err)
@@ -94,5 +130,11 @@ func (s *Sampler) Collect(ctx context.Context) domain.Metrics {
 		metrics.UptimeSeconds = val
 	}
 
-	return metrics
+	s.bufferMu.Lock()
+	defer s.bufferMu.Unlock()
+
+	if len(s.buffer) >= s.batchSize {
+		s.buffer = s.buffer[1:]
+	}
+	s.buffer = append(s.buffer, metrics)
 }

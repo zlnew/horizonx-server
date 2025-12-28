@@ -285,6 +285,53 @@ func (r *JobRepository) Delete(ctx context.Context, jobID int64) error {
 	return nil
 }
 
+func (r *JobRepository) Retry(ctx context.Context, jobID int64, j *domain.Job) (*domain.Job, error) {
+	query := `
+		UPDATE jobs
+		SET
+			status = $2,
+			queued_at = $3,
+			started_at = null,
+			finished_at = null,
+			expired_at = $4
+		WHERE id = $1
+		RETURNING
+			id,
+			trace_id,
+			server_id,
+			application_id,
+			deployment_id,
+			type,
+			payload,
+			status,
+			queued_at,
+			expired_at
+	`
+
+	err := r.db.QueryRow(ctx, query,
+		jobID,
+		j.Status,
+		j.QueuedAt,
+		j.ExpiredAt,
+	).Scan(
+		&j.ID,
+		&j.TraceID,
+		&j.ServerID,
+		&j.ApplicationID,
+		&j.DeploymentID,
+		&j.Type,
+		&j.Payload,
+		&j.Status,
+		&j.QueuedAt,
+		&j.ExpiredAt,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to retry job: %w", err)
+	}
+
+	return j, nil
+}
+
 func (r *JobRepository) MarkRunning(ctx context.Context, jobID int64) (*domain.Job, error) {
 	query := `
 		UPDATE jobs

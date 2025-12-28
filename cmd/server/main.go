@@ -20,6 +20,7 @@ import (
 	"horizonx-server/internal/application/metrics"
 	"horizonx-server/internal/application/server"
 	"horizonx-server/internal/application/user"
+	"horizonx-server/internal/application/workers"
 	"horizonx-server/internal/config"
 	"horizonx-server/internal/event"
 	"horizonx-server/internal/logger"
@@ -59,7 +60,7 @@ func main() {
 	authService := auth.NewService(userRepo, cfg.JWTSecret, cfg.JWTExpiry)
 	userService := user.NewService(userRepo)
 	jobService := job.NewService(jobRepo, logRepo, bus)
-	metricsService := metrics.NewService(metricsRepo, bus, log)
+	metricsService := metrics.NewService(cfg, metricsRepo, bus, log)
 	deploymentService := deployment.NewService(deploymentRepo, logRepo, bus)
 	applicationService := application.NewService(applicationRepo, serverService, jobService, deploymentService, bus)
 
@@ -109,6 +110,17 @@ func main() {
 		ServerService: serverService,
 	})
 
+	// Worker Manager
+	wSheduler := workers.NewScheduler(log)
+	wManager := workers.NewManager(wSheduler, cfg, log, &workers.ManagerServices{
+		Job:         jobService,
+		Server:      serverService,
+		Metrics:     metricsService,
+		Application: applicationService,
+	})
+	wManager.Start(ctx)
+
+	// HTTP Server
 	srv := http.NewServer(router, cfg.Address)
 
 	errCh := make(chan error, 1)

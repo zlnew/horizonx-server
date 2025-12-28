@@ -17,16 +17,20 @@ import (
 type EmitHandler = func(event any)
 
 type Executor struct {
-	log    logger.Logger
-	docker *docker.Manager
-	git    *git.Manager
+	metrics func() domain.Metrics
+	docker  *docker.Manager
+	git     *git.Manager
+
+	log logger.Logger
 }
 
-func NewExecutor(log logger.Logger, workDir string) *Executor {
+func NewExecutor(workDir string, metrics func() domain.Metrics, log logger.Logger) *Executor {
 	return &Executor{
-		log:    log,
-		docker: docker.NewManager(workDir),
-		git:    git.NewManager(workDir),
+		docker:  docker.NewManager(workDir),
+		git:     git.NewManager(workDir),
+		metrics: metrics,
+
+		log: log,
 	}
 }
 
@@ -46,18 +50,21 @@ func (e *Executor) Initialize() error {
 	return e.docker.Initialize()
 }
 
-func (e *Executor) Execute(ctx context.Context, job *domain.Job, onEmit EmitHandler) error {
-	e.log.Info("executing job", "job_id", job.ID)
+func (e *Executor) Execute(ctx context.Context, job *domain.Job, emit EmitHandler) error {
+	e.log.Debug("executing job", "job_id", job.ID)
 
 	switch job.Type {
+	case domain.JobTypeMetricsCollect:
+		emit(e.metrics())
+		return nil
 	case domain.JobTypeAppDeploy:
-		return e.deployApp(ctx, job, onEmit)
+		return e.deployApp(ctx, job, emit)
 	case domain.JobTypeAppStart:
-		return e.startApp(ctx, job, onEmit)
+		return e.startApp(ctx, job, emit)
 	case domain.JobTypeAppStop:
-		return e.stopApp(ctx, job, onEmit)
+		return e.stopApp(ctx, job, emit)
 	case domain.JobTypeAppRestart:
-		return e.restartApp(ctx, job, onEmit)
+		return e.restartApp(ctx, job, emit)
 	default:
 		return fmt.Errorf("unknown job type: %s", job.Type)
 	}

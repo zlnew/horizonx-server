@@ -20,10 +20,12 @@ type (
 )
 
 const (
-	JobTypeAppDeploy  JobType = "app_deploy"
-	JobTypeAppStart   JobType = "app_start"
-	JobTypeAppStop    JobType = "app_stop"
-	JobTypeAppRestart JobType = "app_restart"
+	JobTypeAppDeploy      JobType = "app_deploy"
+	JobTypeAppStart       JobType = "app_start"
+	JobTypeAppStop        JobType = "app_stop"
+	JobTypeAppRestart     JobType = "app_restart"
+	JobTypeAppHealthCheck JobType = "app_health_check"
+	JobTypeMetricsCollect JobType = "metrics_collect"
 )
 
 const (
@@ -71,6 +73,7 @@ type JobRepository interface {
 	GetByID(ctx context.Context, jobID int64) (*Job, error)
 	Create(ctx context.Context, j *Job) (*Job, error)
 	Delete(ctx context.Context, jobID int64) error
+	Retry(ctx context.Context, jobID int64, j *Job) (*Job, error)
 	MarkRunning(ctx context.Context, jobID int64) (*Job, error)
 	MarkFinished(ctx context.Context, jobID int64, status JobStatus) (*Job, error)
 }
@@ -81,6 +84,7 @@ type JobService interface {
 	GetByID(ctx context.Context, jobID int64) (*Job, error)
 	Create(ctx context.Context, j *Job) (*Job, error)
 	Delete(ctx context.Context, jobID int64) error
+	Retry(ctx context.Context, jobID int64, j *Job) (*Job, error)
 	Start(ctx context.Context, jobID int64) (*Job, error)
 	Finish(ctx context.Context, jobID int64, status JobStatus) (*Job, error)
 }

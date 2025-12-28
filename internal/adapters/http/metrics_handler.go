@@ -2,6 +2,7 @@ package http
 
 import (
 	"encoding/json"
+	"errors"
 	"net/http"
 
 	"horizonx-server/internal/domain"
@@ -20,30 +21,21 @@ func NewMetricsHandler(svc domain.MetricsService) *MetricsHandler {
 }
 
 func (h *MetricsHandler) Ingest(w http.ResponseWriter, r *http.Request) {
-	var payload domain.MetricsPayload
+	var metrics domain.Metrics
 
-	if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
-		JSONError(w, http.StatusBadRequest, "Invalid request body")
+	if err := json.NewDecoder(r.Body).Decode(&metrics); err != nil {
+		JSONError(w, http.StatusBadRequest, "invalid request body")
 		return
 	}
 
-	if len(payload.Metrics) == 0 {
-		JSONError(w, http.StatusBadRequest, "No metrics provided")
+	if err := h.svc.Ingest(metrics); err != nil {
+		JSONError(w, http.StatusInternalServerError, "failed to process metrics")
 		return
 	}
 
-	for i := range payload.Metrics {
-		if err := h.svc.Ingest(payload.Metrics[i]); err != nil {
-			JSONError(w, http.StatusInternalServerError, "Failed to process metrics")
-			return
-		}
-	}
-
-	JSONSuccess(w, http.StatusOK, APIResponse{
+	JSONSuccess(w, http.StatusCreated, APIResponse{
 		Message: "Metrics received",
-		Data: map[string]any{
-			"count": len(payload.Metrics),
-		},
+		Data:    metrics,
 	})
 }
 
@@ -54,9 +46,14 @@ func (h *MetricsHandler) Latest(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	metrics, ok := h.svc.Latest(serverID)
-	if !ok {
-		JSONError(w, http.StatusNotFound, "no metrics yet")
+	metrics, err := h.svc.Latest(serverID)
+	if err != nil {
+		if errors.Is(err, domain.ErrMetricsNotFound) {
+			JSONError(w, http.StatusNotFound, "metrics not found")
+			return
+		}
+
+		JSONError(w, http.StatusInternalServerError, "failed to get latest metrics")
 		return
 	}
 

@@ -4,6 +4,7 @@ package agent
 import (
 	"context"
 	"fmt"
+	"sync"
 	"time"
 
 	"horizonx-server/internal/agent/executor"
@@ -16,16 +17,16 @@ import (
 type JobWorker struct {
 	cfg      *config.Config
 	log      logger.Logger
-	executor *executor.Executor
 	client   *Client
+	executor *executor.Executor
 }
 
-func NewJobWorker(cfg *config.Config, log logger.Logger, workDir string) *JobWorker {
+func NewJobWorker(cfg *config.Config, log logger.Logger, metrics func() domain.Metrics) *JobWorker {
 	return &JobWorker{
 		cfg:      cfg,
 		log:      log,
-		executor: executor.NewExecutor(log, workDir),
 		client:   NewClient(cfg),
+		executor: executor.NewExecutor("/var/horizonx/apps", metrics, log),
 	}
 }
 
@@ -63,7 +64,7 @@ func (w *JobWorker) pollAndExecuteJobs(ctx context.Context) error {
 		return nil
 	}
 
-	w.log.Info("received jobs", "count", len(jobs))
+	w.log.Debug("received jobs", "count", len(jobs))
 
 	for _, job := range jobs {
 		if err := w.processJob(ctx, job); err != nil {
@@ -75,7 +76,7 @@ func (w *JobWorker) pollAndExecuteJobs(ctx context.Context) error {
 }
 
 func (w *JobWorker) processJob(ctx context.Context, job domain.Job) error {
-	w.log.Info("processing job", "job_id", job.ID)
+	w.log.Debug("processing job", "job_id", job.ID)
 
 	if err := w.client.StartJob(ctx, job.ID); err != nil {
 		w.log.Error("failed to mark job as running", "job_id", job.ID, "error", err)
@@ -89,7 +90,7 @@ func (w *JobWorker) processJob(ctx context.Context, job domain.Job) error {
 		status = domain.JobFailed
 		w.log.Error("job execution failed", "job_id", job.ID, "error", execErr)
 	} else {
-		w.log.Info("job executed successfully", "job_id", job.ID)
+		w.log.Debug("job executed successfully", "job_id", job.ID)
 	}
 
 	if err := w.client.FinishJob(ctx, job.ID, status); err != nil {
@@ -101,17 +102,19 @@ func (w *JobWorker) processJob(ctx context.Context, job domain.Job) error {
 }
 
 func (w *JobWorker) execute(job domain.Job) error {
-	logCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
 	logCh := make(chan domain.EventLogEmitted, 200)
 	commitCh := make(chan domain.EventCommitInfoEmitted, 10)
 
-	done := make(chan struct{})
+	var wg sync.WaitGroup
+	wg.Add(2)
+
 	go func() {
-		defer close(done)
+		defer wg.Done()
 		for evt := range logCh {
-			err := w.client.SendLog(logCtx, &domain.LogEmitRequest{
+			err := w.client.SendLog(ctx, &domain.LogEmitRequest{
 				Timestamp:     evt.Timestamp,
 				Level:         evt.Level,
 				Source:        evt.Source,
@@ -125,38 +128,64 @@ func (w *JobWorker) execute(job domain.Job) error {
 				Context:       evt.Context,
 			})
 			if err != nil {
-				w.log.Error("send log failed", "error", err)
+				w.log.Error("failed to send log", "error", err)
 			}
 		}
 	}()
 
 	go func() {
+		defer wg.Done()
 		for evt := range commitCh {
-			_ = w.client.SendCommitInfo(
-				logCtx,
+			if err := w.client.SendCommitInfo(
+				ctx,
 				evt.DeploymentID,
 				evt.Hash,
 				evt.Message,
-			)
+			); err != nil {
+				w.log.Error("failed to send commit info", "error", err)
+			}
 		}
 	}()
 
 	bus := event.New()
 
-	bus.Subscribe("log", func(e any) {
-		logCh <- e.(domain.EventLogEmitted)
+	bus.Subscribe("metrics", func(event any) {
+		metrics, ok := event.(domain.Metrics)
+		if !ok {
+			return
+		}
+
+		if err := w.client.SendMetrics(ctx, &metrics); err != nil {
+			w.log.Error("failed to send metrics", "error", err)
+		}
 	})
 
-	bus.Subscribe("commit_info", func(e any) {
-		commitCh <- e.(domain.EventCommitInfoEmitted)
+	bus.Subscribe("log", func(event any) {
+		evt, ok := event.(domain.EventLogEmitted)
+		if !ok {
+			return
+		}
+
+		logCh <- evt
 	})
 
-	onEmit := func(e any) {
-		switch e.(type) {
+	bus.Subscribe("commit_info", func(event any) {
+		evt, ok := event.(domain.EventCommitInfoEmitted)
+		if !ok {
+			return
+		}
+
+		commitCh <- evt
+	})
+
+	onEmit := func(event any) {
+		switch event.(type) {
+		case domain.Metrics:
+			bus.Publish("metrics", event)
 		case domain.EventLogEmitted:
-			bus.Publish("log", e)
+			bus.Publish("log", event)
 		case domain.EventCommitInfoEmitted:
-			bus.Publish("commit_info", e)
+			bus.Publish("commit_info", event)
 		}
 	}
 
@@ -164,7 +193,8 @@ func (w *JobWorker) execute(job domain.Job) error {
 
 	close(logCh)
 	close(commitCh)
-	<-done
+
+	wg.Wait()
 
 	return err
 }

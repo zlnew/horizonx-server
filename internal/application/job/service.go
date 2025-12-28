@@ -114,6 +114,23 @@ func (s *JobService) Delete(ctx context.Context, jobID int64) error {
 	return s.repo.Delete(ctx, jobID)
 }
 
+func (s *JobService) Retry(ctx context.Context, jobID int64, j *domain.Job) (*domain.Job, error) {
+	job, err := s.repo.Retry(ctx, jobID, j)
+	if err != nil {
+		return nil, err
+	}
+
+	if s.bus != nil {
+		s.bus.Publish("job_status_changed", domain.EventJobStatusChanged{
+			JobID:   job.ID,
+			TraceID: job.TraceID,
+			Status:  job.Status,
+		})
+	}
+
+	return job, nil
+}
+
 func (s *JobService) Start(ctx context.Context, jobID int64) (*domain.Job, error) {
 	job, err := s.repo.MarkRunning(ctx, jobID)
 	if err != nil {
