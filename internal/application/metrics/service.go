@@ -35,7 +35,7 @@ func NewService(cfg *config.Config, repo domain.MetricsRepository, bus *event.Bu
 		repo:   repo,
 		bus:    bus,
 		log:    log,
-		buffer: make([]domain.Metrics, 0, 100),
+		buffer: make([]domain.Metrics, 0, cfg.MetricsBufferSize),
 		latest: make(map[uuid.UUID]domain.Metrics),
 	}
 
@@ -54,10 +54,10 @@ func (s *Service) Ingest(m domain.Metrics) error {
 	bufferSize := len(s.buffer)
 	s.bufferMu.Unlock()
 
-	s.log.Debug("metric added to buffer", "buffer_size", bufferSize)
+	s.log.Info("metric added to buffer", "buffer_size", bufferSize)
 
 	if bufferSize >= s.cfg.MetricsBatchSize {
-		s.log.Debug("buffer size reached, forcing flush", "size", bufferSize)
+		s.log.Info("buffer size reached, forcing flush", "size", bufferSize)
 		go s.safeFlush()
 	}
 

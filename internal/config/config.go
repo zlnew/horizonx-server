@@ -21,8 +21,8 @@ type Config struct {
 	LogFormat      string
 
 	MetricsCollectInterval time.Duration
-	MetricsCleanupInterval time.Duration
 	MetricsFlushInterval   time.Duration
+	MetricsBufferSize      int
 	MetricsBatchSize       int
 
 	AgentTargetAPIURL   string
@@ -69,19 +69,13 @@ func Load() *Config {
 
 	// Metrics
 	metricsCollectInterval := 10 * time.Second
-	metricsCleanupInterval := 24 * time.Hour
-	metricsFlushInterval := 5 * time.Second
-	metricsBatchSize := 20
+	metricsFlushInterval := 15 * time.Second
+	metricsBufferSize := 50
+	metricsBatchSize := 10
 
 	if raw := getEnv("METRICS_COLLECT_INTERVAL", "10s"); raw != "" {
 		if duration, err := time.ParseDuration(raw); err == nil && duration > 0 {
 			metricsCollectInterval = duration
-		}
-	}
-
-	if raw := os.Getenv("METRICS_CLEANUP_INTERVAL"); raw != "" {
-		if duration, err := time.ParseDuration(raw); err == nil && duration > 0 {
-			metricsCleanupInterval = duration
 		}
 	}
 
@@ -122,8 +116,8 @@ func Load() *Config {
 		LogFormat:      logFormat,
 
 		MetricsCollectInterval: metricsCollectInterval,
-		MetricsCleanupInterval: metricsCleanupInterval,
 		MetricsFlushInterval:   metricsFlushInterval,
+		MetricsBufferSize:      metricsBufferSize,
 		MetricsBatchSize:       metricsBatchSize,
 
 		AgentTargetAPIURL:   agentTargetAPIURL,
