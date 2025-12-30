@@ -5,7 +5,6 @@ import (
 	"errors"
 	"net/http"
 
-	"horizonx-server/internal/adapters/http/middleware"
 	"horizonx-server/internal/domain"
 
 	"github.com/google/uuid"
@@ -22,11 +21,6 @@ func NewMetricsHandler(svc domain.MetricsService) *MetricsHandler {
 }
 
 func (h *MetricsHandler) Ingest(w http.ResponseWriter, r *http.Request) {
-	serverID, ok := middleware.GetServerID(r.Context())
-	if !ok {
-		JSONError(w, http.StatusUnauthorized, "invalid credentials")
-	}
-
 	var metrics domain.Metrics
 
 	if err := json.NewDecoder(r.Body).Decode(&metrics); err != nil {
@@ -34,7 +28,7 @@ func (h *MetricsHandler) Ingest(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := h.svc.Ingest(serverID, metrics); err != nil {
+	if err := h.svc.Ingest(metrics); err != nil {
 		JSONError(w, http.StatusInternalServerError, "failed to process metrics")
 		return
 	}
@@ -66,5 +60,53 @@ func (h *MetricsHandler) Latest(w http.ResponseWriter, r *http.Request) {
 	JSONSuccess(w, http.StatusOK, APIResponse{
 		Message: "OK",
 		Data:    metrics,
+	})
+}
+
+func (h *MetricsHandler) CPUUsageHistory(w http.ResponseWriter, r *http.Request) {
+	serverID, err := uuid.Parse(r.PathValue("id"))
+	if err != nil {
+		JSONError(w, http.StatusNotFound, "server not found")
+		return
+	}
+
+	data, err := h.svc.CPUUsageHistory(serverID)
+	if err != nil {
+		if errors.Is(err, domain.ErrMetricsNotFound) {
+			JSONError(w, http.StatusNotFound, "cpu usage history not found")
+			return
+		}
+
+		JSONError(w, http.StatusInternalServerError, "failed to get cpu usage history")
+		return
+	}
+
+	JSONSuccess(w, http.StatusOK, APIResponse{
+		Message: "OK",
+		Data:    data,
+	})
+}
+
+func (h *MetricsHandler) NetSpeedHistory(w http.ResponseWriter, r *http.Request) {
+	serverID, err := uuid.Parse(r.PathValue("id"))
+	if err != nil {
+		JSONError(w, http.StatusNotFound, "server not found")
+		return
+	}
+
+	data, err := h.svc.NetSpeedHistory(serverID)
+	if err != nil {
+		if errors.Is(err, domain.ErrMetricsNotFound) {
+			JSONError(w, http.StatusNotFound, "net speed history not found")
+			return
+		}
+
+		JSONError(w, http.StatusInternalServerError, "failed to get net speed history")
+		return
+	}
+
+	JSONSuccess(w, http.StatusOK, APIResponse{
+		Message: "OK",
+		Data:    data,
 	})
 }

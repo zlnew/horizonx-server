@@ -20,23 +20,44 @@ type Service struct {
 	bus  *event.Bus
 	log  logger.Logger
 
-	buffer   []domain.Metrics
+	buffer []domain.Metrics
+	latest map[uuid.UUID]domain.Metrics
+
 	bufferMu sync.Mutex
-
-	latest   map[uuid.UUID]domain.Metrics
 	latestMu sync.Mutex
+	flushMu  sync.Mutex
 
-	flushMu sync.Mutex
+	cpuUsageHistory map[uuid.UUID][]domain.CPUUsageSample
+	netSpeedHistory map[uuid.UUID][]domain.NetworkSpeedSample
+
+	cpuUsageMu sync.RWMutex
+	netSpeedMu sync.RWMutex
+
+	cpuUsageHistoryRetention time.Duration
+	netSpeedHistoryRetention time.Duration
+
+	flushInterval     time.Duration
+	broadcastInterval time.Duration
 }
 
 func NewService(cfg *config.Config, repo domain.MetricsRepository, bus *event.Bus, log logger.Logger) domain.MetricsService {
 	svc := &Service{
-		cfg:    cfg,
-		repo:   repo,
-		bus:    bus,
-		log:    log,
-		buffer: make([]domain.Metrics, 0, cfg.MetricsBufferSize),
+		cfg:  cfg,
+		repo: repo,
+		bus:  bus,
+		log:  log,
+
+		buffer: make([]domain.Metrics, 0, 50),
 		latest: make(map[uuid.UUID]domain.Metrics),
+
+		cpuUsageHistory: make(map[uuid.UUID][]domain.CPUUsageSample),
+		netSpeedHistory: make(map[uuid.UUID][]domain.NetworkSpeedSample),
+
+		cpuUsageHistoryRetention: 15 * time.Minute,
+		netSpeedHistoryRetention: 15 * time.Minute,
+
+		flushInterval:     15 * time.Second,
+		broadcastInterval: 10 * time.Second,
 	}
 
 	go svc.backgroundFlusher()
@@ -45,10 +66,13 @@ func NewService(cfg *config.Config, repo domain.MetricsRepository, bus *event.Bu
 	return svc
 }
 
-func (s *Service) Ingest(serverID uuid.UUID, m domain.Metrics) error {
-	s.latestMu.Lock()
-	s.latest[m.ServerID] = m
-	s.latestMu.Unlock()
+func (s *Service) Ingest(m domain.Metrics) error {
+	sid := m.ServerID
+	now := time.Now().UTC()
+
+	s.updateLatest(m)
+	s.recordCPUUsage(sid, m.CPU.Usage.EMA, now)
+	s.recordNetSpeed(sid, m.Network.RXSpeedMBs.EMA, m.Network.TXSpeedMBs.EMA, now)
 
 	s.bufferMu.Lock()
 	s.buffer = append(s.buffer, m)
@@ -77,8 +101,79 @@ func (s *Service) Latest(serverID uuid.UUID) (*domain.Metrics, error) {
 	return &metrics, nil
 }
 
+func (s *Service) CPUUsageHistory(serverID uuid.UUID) ([]domain.CPUUsageSample, error) {
+	s.cpuUsageMu.Lock()
+	defer s.cpuUsageMu.Unlock()
+
+	usages, ok := s.cpuUsageHistory[serverID]
+	if !ok {
+		return []domain.CPUUsageSample{}, domain.ErrMetricsNotFound
+	}
+
+	return usages, nil
+}
+
+func (s *Service) NetSpeedHistory(serverID uuid.UUID) ([]domain.NetworkSpeedSample, error) {
+	s.netSpeedMu.Lock()
+	defer s.netSpeedMu.Unlock()
+
+	speeds, ok := s.netSpeedHistory[serverID]
+	if !ok {
+		return []domain.NetworkSpeedSample{}, domain.ErrMetricsNotFound
+	}
+
+	return speeds, nil
+}
+
 func (s *Service) Cleanup(ctx context.Context, serverID uuid.UUID, cutoff time.Time) error {
 	return s.repo.Cleanup(ctx, serverID, cutoff)
+}
+
+func (s *Service) updateLatest(m domain.Metrics) {
+	s.latestMu.Lock()
+	s.latest[m.ServerID] = m
+	s.latestMu.Unlock()
+}
+
+func (s *Service) recordCPUUsage(serverID uuid.UUID, usage float64, at time.Time) {
+	s.cpuUsageMu.Lock()
+	cpuPoints := s.cpuUsageHistory[serverID]
+	cpuPoints = append(cpuPoints, domain.CPUUsageSample{
+		UsagePercent: usage,
+		At:           at,
+	})
+
+	cutoff := at.Add(-s.cpuUsageHistoryRetention)
+	i := 0
+	for ; i < len(cpuPoints); i++ {
+		if cpuPoints[i].At.After(cutoff) {
+			break
+		}
+	}
+	cpuPoints = cpuPoints[i:]
+	s.cpuUsageHistory[serverID] = cpuPoints
+	s.cpuUsageMu.Unlock()
+}
+
+func (s *Service) recordNetSpeed(serverID uuid.UUID, rxMBs float64, txMBs float64, at time.Time) {
+	s.netSpeedMu.Lock()
+	netPoints := s.netSpeedHistory[serverID]
+	netPoints = append(netPoints, domain.NetworkSpeedSample{
+		RXMBs: rxMBs,
+		TXMBs: txMBs,
+		At:    at,
+	})
+
+	cutoff := at.Add(-s.netSpeedHistoryRetention)
+	i := 0
+	for ; i < len(netPoints); i++ {
+		if netPoints[i].At.After(cutoff) {
+			break
+		}
+	}
+	netPoints = netPoints[i:]
+	s.netSpeedHistory[serverID] = netPoints
+	s.netSpeedMu.Unlock()
 }
 
 func (s *Service) backgroundFlusher() {

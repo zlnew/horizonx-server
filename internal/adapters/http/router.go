@@ -69,7 +69,11 @@ func NewRouter(cfg *config.Config, deps *RouterDeps) http.Handler {
 	mux.Handle("POST /servers", userStack.Then(http.HandlerFunc(deps.Server.Store)))
 	mux.Handle("PUT /servers/{id}", userStack.Then(http.HandlerFunc(deps.Server.Update)))
 	mux.Handle("DELETE /servers/{id}", userStack.Then(http.HandlerFunc(deps.Server.Destroy)))
+
+	// SERVER METRICS
 	mux.Handle("GET /servers/{id}/metrics/latest", userStack.Then(http.HandlerFunc(deps.Metrics.Latest)))
+	mux.Handle("GET /servers/{id}/metrics/cpu-usage-history", userStack.Then(http.HandlerFunc(deps.Metrics.CPUUsageHistory)))
+	mux.Handle("GET /servers/{id}/metrics/net-speed-history", userStack.Then(http.HandlerFunc(deps.Metrics.NetSpeedHistory)))
 
 	// JOBS (user-facing)
 	mux.Handle("GET /jobs", userStack.Then(http.HandlerFunc(deps.Job.Index)))

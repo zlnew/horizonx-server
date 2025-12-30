@@ -102,9 +102,22 @@ type NetworkMetric struct {
 	TXSpeedMBs Signal `json:"tx_speed_mbs"`
 }
 
+type CPUUsageSample struct {
+	UsagePercent float64   `json:"usage_percent"`
+	At           time.Time `json:"at"`
+}
+
+type NetworkSpeedSample struct {
+	RXMBs float64   `json:"rx_mbs"`
+	TXMBs float64   `json:"tx_mbs"`
+	At    time.Time `json:"at"`
+}
+
 type MetricsService interface {
-	Ingest(serverID uuid.UUID, m Metrics) error
+	Ingest(m Metrics) error
 	Latest(serverID uuid.UUID) (*Metrics, error)
+	CPUUsageHistory(serverID uuid.UUID) ([]CPUUsageSample, error)
+	NetSpeedHistory(serverID uuid.UUID) ([]NetworkSpeedSample, error)
 	Cleanup(ctx context.Context, serverID uuid.UUID, cutoff time.Time) error
 }
 
