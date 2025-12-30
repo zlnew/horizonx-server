@@ -53,7 +53,26 @@ type Collector struct {
 	lastDiskIO    map[string]DiskIOState
 	lastNet       map[string]NetState
 
-	cachedIface string
+	cpuUsageEMA   *EMA
+	cpuFreqEMA    *EMA
+	cpuPowerEMA   *EMA
+	cpuTempEMA    *EMA
+	cpuPerCoreEMA map[string]*EMA
+
+	gpuUsageEMA map[string]*EMA
+	gpuClockEMA map[string]*EMA
+	gpuPowerEMA map[string]*EMA
+	gpuTempEMA  map[string]*EMA
+
+	diskReadEMA  map[string]*EMA
+	diskWriteEMA map[string]*EMA
+	diskUtilEMA  map[string]*EMA
+	diskTempEMA  map[string]*EMA
+
+	netRxEMA map[string]*EMA
+	netTxEMA map[string]*EMA
+
+	iface string
 }
 
 func NewCollector(cfg *config.Config, log logger.Logger) *Collector {
@@ -69,6 +88,25 @@ func NewCollector(cfg *config.Config, log logger.Logger) *Collector {
 
 		lastDiskIO: make(map[string]DiskIOState),
 		lastNet:    make(map[string]NetState),
+
+		cpuUsageEMA:   NewEMA(15 * time.Second),
+		cpuFreqEMA:    NewEMA(20 * time.Second),
+		cpuPowerEMA:   NewEMA(20 * time.Second),
+		cpuTempEMA:    NewEMA(30 * time.Second),
+		cpuPerCoreEMA: map[string]*EMA{},
+
+		gpuUsageEMA: map[string]*EMA{},
+		gpuClockEMA: map[string]*EMA{},
+		gpuPowerEMA: map[string]*EMA{},
+		gpuTempEMA:  map[string]*EMA{},
+
+		diskReadEMA:  map[string]*EMA{},
+		diskWriteEMA: map[string]*EMA{},
+		diskUtilEMA:  map[string]*EMA{},
+		diskTempEMA:  map[string]*EMA{},
+
+		netRxEMA: map[string]*EMA{},
+		netTxEMA: map[string]*EMA{},
 	}
 }
 
@@ -116,6 +154,8 @@ func (c *Collector) collect() {
 	metrics.UptimeSeconds = c.reader.Uptime()
 	metrics.RecordedAt = time.Now().UTC()
 
+	c.ApplyEMA(&metrics)
+
 	c.bufferMu.Lock()
 	defer c.bufferMu.Unlock()
 
@@ -127,19 +167,37 @@ func (c *Collector) collect() {
 }
 
 func (c *Collector) getCPUMetric() domain.CPUMetric {
-	var cpu domain.CPUMetric
+	now := time.Now()
 
 	stats := c.reader.CPUCoreStats()
 
-	cpu.Usage, cpu.PerCore = calculateCPUUsage(&c.cpuUsageState, stats)
-	cpu.Temperature = c.reader.CPUTempC()
-	cpu.Frequency = c.reader.CPUFreqAvgMhz()
+	coreAvg, perCore := calculateCPUUsage(&c.cpuUsageState, stats)
 
-	watt := calculateCPUPowerWatt(&c.cpuPowerState, c.reader.CPUEnergyUJ(), time.Now())
+	temp := c.reader.CPUTempC()
+	freq := c.reader.CPUFreqAvgMhz()
+
+	watt := calculateCPUPowerWatt(
+		&c.cpuPowerState,
+		c.reader.CPUEnergyUJ(),
+		now,
+	)
+
 	if watt < 0 || watt > 300 {
 		watt = 0
 	}
-	cpu.PowerWatt = watt
+
+	cpu := domain.CPUMetric{
+		PerCore: make([]domain.Signal, len(perCore)),
+	}
+
+	cpu.Usage.Raw = coreAvg
+	cpu.Temperature.Raw = temp
+	cpu.Frequency.Raw = freq
+	cpu.PowerWatt.Raw = watt
+
+	for i, v := range perCore {
+		cpu.PerCore[i].Raw = v
+	}
 
 	return cpu
 }
@@ -166,48 +224,52 @@ func (c *Collector) getGPUMetrics() []domain.GPUMetric {
 }
 
 func (c *Collector) getMemoryMetric() domain.MemoryMetric {
-	var memory domain.MemoryMetric
-
 	stats := c.reader.Memory()
 
 	const kbToGB = 1024 * 1024
 
-	memory.TotalGB = float64(stats.MemTotalKB) / kbToGB
-	memory.AvailableGB = float64(stats.MemAvailableKB) / kbToGB
-	memory.UsedGB = float64(stats.MemUsedKB) / kbToGB
-
-	if memory.TotalGB > 0 {
-		memory.UsagePercent = memory.UsedGB / memory.TotalGB * 100
+	m := domain.MemoryMetric{
+		TotalGB:     float64(stats.MemTotalKB) / kbToGB,
+		AvailableGB: float64(stats.MemAvailableKB) / kbToGB,
+		UsedGB:      float64(stats.MemUsedKB) / kbToGB,
+		SwapTotalGB: float64(stats.SwapTotalKB) / kbToGB,
+		SwapFreeGB:  float64(stats.SwapFreeKB) / kbToGB,
+		SwapUsedGB:  float64(stats.SwapUsedKB) / kbToGB,
 	}
 
-	memory.SwapTotalGB = float64(stats.SwapTotalKB) / kbToGB
-	memory.SwapFreeGB = float64(stats.SwapFreeKB) / kbToGB
-	memory.SwapUsedGB = float64(stats.SwapUsedKB) / kbToGB
+	if m.TotalGB > 0 {
+		m.UsagePercent = m.UsedGB / m.TotalGB * 100
+	}
 
-	return memory
+	return m
 }
 
 func (c *Collector) getDiskMetrics() []domain.DiskMetric {
+	now := time.Now()
+
 	rawDisks := c.reader.Disks()
 	result := make([]domain.DiskMetric, 0, len(rawDisks))
-
-	now := time.Now()
 
 	for _, d := range rawDisks {
 		dm := domain.DiskMetric{
 			Name:        d.Name,
 			RawSizeGB:   float64(d.RawBytes) / (1024 * 1024 * 1024),
-			Temperature: d.Temperature,
 			Filesystems: []domain.FilesystemUsage{},
 		}
 
+		dm.Temperature.Raw = d.Temperature
+
 		io := c.reader.DiskIO(d.Name)
-		dm.ReadMBps, dm.WriteMBps, dm.UtilPct = c.calculateDiskDelta(d.Name, io, now)
+
+		dm.ReadMBps.Raw,
+			dm.WriteMBps.Raw,
+			dm.UtilPct.Raw = c.calculateDiskDelta(d.Name, io, now)
 
 		for _, fs := range d.Filesystems {
 			totalGB := float64(fs.TotalBytes) / (1024 * 1024 * 1024)
 			usedGB := float64(fs.UsedBytes) / (1024 * 1024 * 1024)
 			freeGB := float64(fs.FreeBytes) / (1024 * 1024 * 1024)
+
 			percent := 0.0
 			if totalGB > 0 {
 				percent = usedGB / totalGB * 100
@@ -230,54 +292,48 @@ func (c *Collector) getDiskMetrics() []domain.DiskMetric {
 }
 
 func (c *Collector) getNetworkMetric() domain.NetworkMetric {
-	if c.cachedIface == "" {
-		c.cachedIface = c.reader.DefaultInterface()
+	if c.iface == "" {
+		c.iface = c.reader.DefaultInterface()
 	}
 
-	iface := c.cachedIface
-	if iface == "" {
+	if c.iface == "" {
 		return domain.NetworkMetric{}
 	}
 
-	curr := c.reader.NetBytes(iface)
 	now := time.Now()
+	curr := c.reader.NetBytes(c.iface)
 
-	last, ok := c.lastNet[iface]
+	last, ok := c.lastNet[c.iface]
 
-	if curr.RxBytes == 0 && curr.TxBytes == 0 {
-		c.cachedIface = ""
-		return domain.NetworkMetric{}
-	}
-
-	c.lastNet[iface] = NetState{
+	c.lastNet[c.iface] = NetState{
 		RxBytes: curr.RxBytes,
 		TxBytes: curr.TxBytes,
 		Time:    now,
 	}
 
-	metric := domain.NetworkMetric{
+	m := domain.NetworkMetric{
 		RXBytes: curr.RxBytes,
 		TXBytes: curr.TxBytes,
 	}
+
 	if !ok {
-		return metric
+		return m
 	}
 
 	dt := now.Sub(last.Time).Seconds()
 	if dt <= 0 {
-		return metric
+		return m
 	}
 
-	metric.RXSpeedMBs = float64(curr.RxBytes-last.RxBytes) / 1024 / 1024 / dt
-	metric.TXSpeedMBs = float64(curr.TxBytes-last.TxBytes) / 1024 / 1024 / dt
+	m.RXSpeedMBs.Raw = float64(curr.RxBytes-last.RxBytes) / 1024 / 1024 / dt
+	m.TXSpeedMBs.Raw = float64(curr.TxBytes-last.TxBytes) / 1024 / 1024 / dt
 
-	if metric.RXSpeedMBs < 0 {
-		metric.RXSpeedMBs = 0
+	if m.RXSpeedMBs.Raw < 0 {
+		m.RXSpeedMBs.Raw = 0
+	}
+	if m.TXSpeedMBs.Raw < 0 {
+		m.TXSpeedMBs.Raw = 0
 	}
 
-	if metric.TXSpeedMBs < 0 {
-		metric.TXSpeedMBs = 0
-	}
-
-	return metric
+	return m
 }

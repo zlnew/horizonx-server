@@ -30,6 +30,11 @@ type Metrics struct {
 	RecordedAt    time.Time     `json:"recorded_at"`
 }
 
+type Signal struct {
+	Raw float64 `json:"raw"`
+	EMA float64 `json:"ema"`
+}
+
 type OSInfo struct {
 	Hostname      string `json:"hostname"`
 	Name          string `json:"name"`
@@ -38,23 +43,25 @@ type OSInfo struct {
 }
 
 type CPUMetric struct {
-	Usage       float64   `json:"usage"`
-	PerCore     []float64 `json:"per_core"`
-	Temperature float64   `json:"temperature"`
-	Frequency   float64   `json:"frequency"`
-	PowerWatt   float64   `json:"power_watt"`
+	Usage       Signal   `json:"usage"`
+	PerCore     []Signal `json:"per_core"`
+	Temperature Signal   `json:"temperature"`
+	Frequency   Signal   `json:"frequency"`
+	PowerWatt   Signal   `json:"power_watt"`
 }
 
 type GPUMetric struct {
-	Card             string  `json:"card"`
-	Vendor           string  `json:"vendor"`
-	Temperature      int     `json:"temperature"`
-	CoreUsagePercent int     `json:"core_usage_percent"`
-	FrequencyMhz     int     `json:"frequency_mhz"`
-	VRAMTotalGB      float64 `json:"vram_total_gb"`
-	VRAMUsedGB       float64 `json:"vram_used_gb"`
-	VRAMPercent      float64 `json:"vram_percent"`
-	PowerWatt        float64 `json:"power_watt"`
+	Card   string `json:"card"`
+	Vendor string `json:"vendor"`
+
+	Temperature      Signal `json:"temperature"`
+	CoreUsagePercent Signal `json:"core_usage_percent"`
+	FrequencyMhz     Signal `json:"frequency_mhz"`
+	PowerWatt        Signal `json:"power_watt"`
+
+	VRAMTotalGB float64 `json:"vram_total_gb"`
+	VRAMUsedGB  float64 `json:"vram_used_gb"`
+	VRAMPercent float64 `json:"vram_percent"`
 }
 
 type MemoryMetric struct {
@@ -70,11 +77,11 @@ type MemoryMetric struct {
 type DiskMetric struct {
 	Name        string  `json:"name"`
 	RawSizeGB   float64 `json:"raw_size_gb"`
-	Temperature float64 `json:"temperature"`
+	Temperature Signal  `json:"temperature"`
 
-	ReadMBps  float64 `json:"read_mbps"`
-	WriteMBps float64 `json:"write_mbps"`
-	UtilPct   float64 `json:"util_pct"`
+	ReadMBps  Signal `json:"read_mbps"`
+	WriteMBps Signal `json:"write_mbps"`
+	UtilPct   Signal `json:"util_pct"`
 
 	Filesystems []FilesystemUsage `json:"filesystems"`
 }
@@ -89,10 +96,10 @@ type FilesystemUsage struct {
 }
 
 type NetworkMetric struct {
-	RXBytes    uint64  `json:"rx_bytes"`
-	TXBytes    uint64  `json:"tx_bytes"`
-	RXSpeedMBs float64 `json:"rx_speed_mbs"`
-	TXSpeedMBs float64 `json:"tx_speed_mbs"`
+	RXBytes    uint64 `json:"rx_bytes"`
+	TXBytes    uint64 `json:"tx_bytes"`
+	RXSpeedMBs Signal `json:"rx_speed_mbs"`
+	TXSpeedMBs Signal `json:"tx_speed_mbs"`
 }
 
 type MetricsService interface {

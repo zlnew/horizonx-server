@@ -9,7 +9,7 @@ import (
 	"horizonx-server/internal/system"
 )
 
-func calculateCPUUsage(state *CPUUsageState, curr map[string]system.CPUStat) (total float64, perCore []float64) {
+func calculateCPUUsage(state *CPUUsageState, curr map[string]system.CPUStat) (coreAvg float64, perCore []float64) {
 	if state.Last == nil {
 		state.Last = make(map[string]system.CPUStat, len(curr))
 		maps.Copy(state.Last, curr)
@@ -69,7 +69,7 @@ func calculateCPUUsage(state *CPUUsageState, curr map[string]system.CPUStat) (to
 			di := float64(ci - pi)
 
 			if dt > 0 {
-				total = (dt - di) / dt * 100
+				coreAvg = (dt - di) / dt * 100
 			}
 		}
 	}
@@ -77,7 +77,7 @@ func calculateCPUUsage(state *CPUUsageState, curr map[string]system.CPUStat) (to
 	state.Last = make(map[string]system.CPUStat, len(curr))
 	maps.Copy(state.Last, curr)
 
-	return total, perCore
+	return coreAvg, perCore
 }
 
 func calculateCPUPowerWatt(state *CPUPowerState, currEnergyUJ uint64, currTime time.Time) float64 {

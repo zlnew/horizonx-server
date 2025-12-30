@@ -15,10 +15,10 @@ func calculateGPUMetric(card string, vendor string, m *system.GPUMetrics) domain
 	gpu.Card = card
 	gpu.Vendor = vendor
 
-	gpu.Temperature = m.TemperatureC
-	gpu.CoreUsagePercent = m.UtilizationGPU
-	gpu.FrequencyMhz = m.ClockMHz
-	gpu.PowerWatt = m.PowerDrawW
+	gpu.Temperature.Raw = float64(m.TemperatureC)
+	gpu.CoreUsagePercent.Raw = float64(m.UtilizationGPU)
+	gpu.FrequencyMhz.Raw = float64(m.ClockMHz)
+	gpu.PowerWatt.Raw = m.PowerDrawW
 
 	if m.MemTotalMB > 0 {
 		gpu.VRAMTotalGB = float64(m.MemTotalMB) / 1024

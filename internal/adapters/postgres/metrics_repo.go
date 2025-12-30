@@ -26,7 +26,7 @@ func (r *MetricsRepository) BulkInsert(ctx context.Context, metrics []domain.Met
 	for i, m := range metrics {
 		rows[i] = []any{
 			m.ServerID,
-			m.CPU.Usage,
+			m.CPU.Usage.EMA,
 			m.Memory.UsagePercent,
 			m,
 			m.RecordedAt,
