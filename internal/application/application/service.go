@@ -36,10 +36,6 @@ func NewService(
 	}
 }
 
-// ============================================================================
-// APPLICATIONS
-// ============================================================================
-
 func (s *Service) List(ctx context.Context, opts domain.ApplicationListOptions) (*domain.ListResult[*domain.Application], error) {
 	if opts.IsPaginate {
 		if opts.Page <= 0 {
@@ -177,10 +173,6 @@ func (s *Service) UpdateStatus(ctx context.Context, appID int64, status domain.A
 func (s *Service) UpdateLastDeployment(ctx context.Context, appID int64) error {
 	return s.repo.UpdateLastDeployment(ctx, appID)
 }
-
-// ============================================================================
-// ACTIONS (Job-based)
-// ============================================================================
 
 func (s *Service) Deploy(ctx context.Context, appID int64, deployedBy int64) (*domain.Deployment, error) {
 	app, err := s.repo.GetByID(ctx, appID)
@@ -334,10 +326,6 @@ func (s *Service) Restart(ctx context.Context, appID int64) error {
 	return err
 }
 
-// ============================================================================
-// ENVIRONMENT VARIABLES
-// ============================================================================
-
 func (s *Service) ListEnvVars(ctx context.Context, appID int64) ([]domain.EnvironmentVariable, error) {
 	_, err := s.repo.GetByID(ctx, appID)
 	if err != nil {
@@ -386,4 +374,8 @@ func (s *Service) DeleteEnvVar(ctx context.Context, appID int64, key string) err
 	}
 
 	return s.repo.DeleteEnvVar(ctx, appID, key)
+}
+
+func (s *Service) UpdateHealth(ctx context.Context, serverID uuid.UUID, reports []domain.ApplicationHealth) error {
+	return s.repo.UpdateHealth(ctx, serverID, reports)
 }

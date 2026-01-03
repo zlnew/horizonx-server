@@ -9,6 +9,7 @@ import (
 
 	"horizonx-server/internal/domain"
 
+	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
@@ -20,10 +21,6 @@ type ApplicationRepository struct {
 func NewApplicationRepository(db *pgxpool.Pool) domain.ApplicationRepository {
 	return &ApplicationRepository{db: db}
 }
-
-// ============================================================================
-// APPLICATIONS
-// ============================================================================
 
 func (r *ApplicationRepository) List(ctx context.Context, opts domain.ApplicationListOptions) ([]*domain.Application, int64, error) {
 	baseQuery := `
@@ -247,10 +244,6 @@ func (r *ApplicationRepository) UpdateLastDeployment(ctx context.Context, appID 
 	return nil
 }
 
-// ============================================================================
-// ENVIRONMENT VARIABLES
-// ============================================================================
-
 func (r *ApplicationRepository) SyncEnvVars(ctx context.Context, appID int64, envVars []domain.EnvironmentVariable) error {
 	if len(envVars) == 0 {
 		return nil
@@ -416,6 +409,39 @@ func (r *ApplicationRepository) DeleteEnvVar(ctx context.Context, appID int64, k
 
 	if ct.RowsAffected() == 0 {
 		return fmt.Errorf("env var not found")
+	}
+
+	return nil
+}
+
+func (r *ApplicationRepository) UpdateHealth(ctx context.Context, serverID uuid.UUID, reports []domain.ApplicationHealth) error {
+	if len(reports) == 0 {
+		return nil
+	}
+
+	valueStrings := make([]string, 0, len(reports))
+	valueArgs := make([]any, 0, len(reports)*2)
+
+	argPos := 2
+	for _, d := range reports {
+		valueStrings = append(valueStrings, fmt.Sprintf("(%d, %d)", argPos, argPos+1))
+		valueArgs = append(valueArgs, d.ApplicationID, d.Status)
+		argPos += 2
+	}
+
+	query := fmt.Sprintf(`
+		UPDATE applications a
+		SET status = v.status
+		FROM (VALUES %s) AS v(app_id, status)
+		WHERE a.app_id = v.app_id
+		  AND a.server_id = $1
+	`, strings.Join(valueStrings, ","))
+
+	args := append([]any{serverID}, valueArgs...)
+
+	_, err := r.db.Exec(ctx, query, args...)
+	if err != nil {
+		return fmt.Errorf("failed to update applications health")
 	}
 
 	return nil

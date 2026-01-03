@@ -89,6 +89,7 @@ type ApplicationRepository interface {
 	Update(ctx context.Context, app *Application, appID int64) error
 	UpdateStatus(ctx context.Context, appID int64, status ApplicationStatus) error
 	UpdateLastDeployment(ctx context.Context, appID int64) error
+	UpdateHealth(ctx context.Context, serverID uuid.UUID, reports []ApplicationHealth) error
 	Delete(ctx context.Context, appID int64) error
 
 	SyncEnvVars(ctx context.Context, appID int64, envVars []EnvironmentVariable) error
@@ -105,6 +106,7 @@ type ApplicationService interface {
 	Update(ctx context.Context, req ApplicationUpdateRequest, appID int64) error
 	UpdateStatus(ctx context.Context, appID int64, status ApplicationStatus) error
 	UpdateLastDeployment(ctx context.Context, appID int64) error
+	UpdateHealth(ctx context.Context, serverID uuid.UUID, reports []ApplicationHealth) error
 	Delete(ctx context.Context, appID int64) error
 
 	Deploy(ctx context.Context, appID int64, deployedBy int64) (*Deployment, error)

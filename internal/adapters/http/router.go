@@ -55,10 +55,11 @@ func NewRouter(cfg *config.Config, deps *RouterDeps) http.Handler {
 
 	// AGENT ENDPOINTS
 	mux.Handle("POST /agent/logs", agentStack.Then(http.HandlerFunc(deps.Log.Store)))
-	mux.Handle("POST /agent/metrics", agentStack.Then(http.HandlerFunc(deps.Metrics.Ingest)))
 	mux.Handle("GET /agent/jobs", agentStack.Then(http.HandlerFunc(deps.Job.Pending)))
 	mux.Handle("POST /agent/jobs/{id}/start", agentStack.Then(http.HandlerFunc(deps.Job.Start)))
 	mux.Handle("POST /agent/jobs/{id}/finish", agentStack.Then(http.HandlerFunc(deps.Job.Finish)))
+	mux.Handle("POST /agent/metrics", agentStack.Then(http.HandlerFunc(deps.Metrics.Ingest)))
+	mux.Handle("POST /agent/applications/health", agentStack.Then(http.HandlerFunc(deps.Application.ReportHealth)))
 	mux.Handle("POST /agent/deployments/{id}/commit-info", agentStack.Then(http.HandlerFunc(deps.Deployment.UpdateCommitInfo)))
 
 	// LOGS

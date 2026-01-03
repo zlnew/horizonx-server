@@ -162,7 +162,7 @@ func (c *Client) SendAppHealthReports(ctx context.Context, req []domain.Applicat
 	}
 	defer resp.Body.Close()
 
-	if resp.StatusCode != http.StatusCreated {
+	if resp.StatusCode != http.StatusNoContent {
 		return fmt.Errorf("failed to send application health reports, status: %d", resp.StatusCode)
 	}
 

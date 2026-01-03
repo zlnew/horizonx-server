@@ -20,10 +20,6 @@ func NewApplicationHandler(svc domain.ApplicationService) *ApplicationHandler {
 	return &ApplicationHandler{svc: svc}
 }
 
-// ============================================================================
-// APPLICATIONS
-// ============================================================================
-
 func (h *ApplicationHandler) Index(w http.ResponseWriter, r *http.Request) {
 	serverIDStr := r.URL.Query().Get("server_id")
 	if serverIDStr == "" {
@@ -170,10 +166,6 @@ func (h *ApplicationHandler) Destroy(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-// ============================================================================
-// ACTIONS
-// ============================================================================
-
 func (h *ApplicationHandler) Deploy(w http.ResponseWriter, r *http.Request) {
 	appID, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
 	if err != nil {
@@ -265,10 +257,6 @@ func (h *ApplicationHandler) Restart(w http.ResponseWriter, r *http.Request) {
 		Message: "Restarting application",
 	})
 }
-
-// ============================================================================
-// ENVIRONMENT VARIABLES
-// ============================================================================
 
 func (h *ApplicationHandler) AddEnvVar(w http.ResponseWriter, r *http.Request) {
 	appID, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
@@ -365,4 +353,25 @@ func (h *ApplicationHandler) DeleteEnvVar(w http.ResponseWriter, r *http.Request
 	JSONSuccess(w, http.StatusOK, APIResponse{
 		Message: "Environment variable deleted",
 	})
+}
+
+func (h *ApplicationHandler) ReportHealth(w http.ResponseWriter, r *http.Request) {
+	serverID, valid := middleware.GetServerID(r.Context())
+	if !valid {
+		JSONError(w, http.StatusUnauthorized, "invalid credentials")
+		return
+	}
+
+	var req []domain.ApplicationHealth
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		JSONError(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+
+	if err := h.svc.UpdateHealth(r.Context(), serverID, req); err != nil {
+		JSONError(w, http.StatusInternalServerError, "failed to update application health")
+		return
+	}
+
+	JSONSuccess(w, http.StatusNoContent, APIResponse{})
 }
