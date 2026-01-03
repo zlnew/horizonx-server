@@ -6,7 +6,6 @@ import (
 
 	"horizonx-server/internal/domain"
 	"horizonx-server/internal/event"
-	"horizonx-server/internal/pkg"
 
 	"github.com/google/uuid"
 	"golang.org/x/crypto/bcrypt"
@@ -60,7 +59,7 @@ func (s *Service) GetByID(ctx context.Context, serverID uuid.UUID) (*domain.Serv
 }
 
 func (s *Service) Register(ctx context.Context, req domain.ServerSaveRequest) (*domain.Server, string, error) {
-	token, err := pkg.GenerateToken()
+	token, err := domain.GenerateToken()
 	if err != nil {
 		return nil, "", err
 	}

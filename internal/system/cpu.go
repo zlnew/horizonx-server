@@ -6,7 +6,7 @@ import (
 	"strconv"
 	"strings"
 
-	"horizonx-server/internal/pkg"
+	"horizonx-server/internal/domain"
 )
 
 type CPUStat struct {
@@ -131,7 +131,7 @@ func (r *SystemReader) CPUTempC() float64 {
 		}
 
 		name := strings.ToLower(strings.TrimSpace(string(nameBytes)))
-		if !pkg.ContainsAny(name, targetNames) {
+		if !domain.ContainsAny(name, targetNames) {
 			continue
 		}
 

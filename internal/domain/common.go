@@ -1,5 +1,7 @@
 package domain
 
+import "strings"
+
 type ListOptions struct {
 	Page       int    `json:"page"`
 	Limit      int    `json:"limit"`
@@ -41,4 +43,26 @@ func CalculateMeta(total int64, page, limit int) *Meta {
 		Total:       total,
 		LastPage:    lastPage,
 	}
+}
+
+func ContainsAny(s string, xs []string) bool {
+	s = strings.ToLower(s)
+
+	for _, x := range xs {
+		x = strings.ToLower(x)
+
+		if strings.HasSuffix(x, "*") {
+			prefix := strings.TrimSuffix(x, "*")
+			if strings.HasPrefix(s, prefix) {
+				return true
+			}
+			continue
+		}
+
+		if strings.Contains(s, x) {
+			return true
+		}
+	}
+
+	return false
 }

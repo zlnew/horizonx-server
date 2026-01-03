@@ -5,8 +5,8 @@ import (
 	"net/http"
 	"slices"
 
+	"horizonx-server/internal/domain"
 	"horizonx-server/internal/logger"
-	"horizonx-server/internal/pkg"
 
 	"github.com/gorilla/websocket"
 )
@@ -54,7 +54,7 @@ func (h *Handler) Serve(w http.ResponseWriter, r *http.Request) {
 	cookie, err := r.Cookie("access_token")
 	if err == nil {
 		tokenString := cookie.Value
-		claims, err := pkg.ValidateToken(tokenString, h.secret)
+		claims, err := domain.ValidateToken(tokenString, h.secret)
 		if err == nil {
 			if sub, ok := claims["sub"]; ok && sub != nil {
 				clientID = fmt.Sprintf("%v", sub)
