@@ -58,7 +58,7 @@ func (w *MetricsCollectWorker) Run(ctx context.Context) error {
 			continue
 		}
 
-		// Create job
+		// Create new job
 		if len(jobs.Data) == 0 {
 			data := &domain.Job{
 				TraceID:  uuid.New(),
@@ -97,7 +97,6 @@ func (w *MetricsCollectWorker) Run(ctx context.Context) error {
 			}
 
 			w.log.Debug("job retried", "job_id", updatedJob.ID, "job_type", updatedJob.Type)
-			continue
 		}
 	}
 

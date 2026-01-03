@@ -1,5 +1,7 @@
 package domain
 
+import "github.com/google/uuid"
+
 type DeployAppPayload struct {
 	ApplicationID int64             `json:"application_id"`
 	DeploymentID  int64             `json:"deployment_id"`
@@ -18,4 +20,9 @@ type StopAppPayload struct {
 
 type RestartAppPayload struct {
 	ApplicationID int64 `json:"application_id"`
+}
+
+type AppHealthCheckPayload struct {
+	ServerID        uuid.UUID `json:"server_id"`
+	ApplicationsIDs []int64   `json:"application_ids"`
 }

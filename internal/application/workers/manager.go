@@ -56,7 +56,8 @@ func (m *Manager) Start(ctx context.Context) {
 	})
 
 	m.scheduler.RunByDuration(ctx, 10*time.Minute, &ApplicationHealthCheckWorker{
-		svc: m.services.Application,
+		app: m.services.Application,
+		job: m.services.Job,
 		log: m.log,
 	})
 }
