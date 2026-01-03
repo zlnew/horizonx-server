@@ -40,8 +40,35 @@ func NewService(
 // APPLICATIONS
 // ============================================================================
 
-func (s *Service) List(ctx context.Context, serverID uuid.UUID) ([]domain.Application, error) {
-	return s.repo.List(ctx, serverID)
+func (s *Service) List(ctx context.Context, opts domain.ApplicationListOptions) (*domain.ListResult[*domain.Application], error) {
+	if opts.IsPaginate {
+		if opts.Page <= 0 {
+			opts.Page = 1
+		}
+		if opts.Limit <= 0 {
+			opts.Limit = 10
+		}
+	} else {
+		if opts.Limit <= 0 {
+			opts.Limit = 1000
+		}
+	}
+
+	applications, total, err := s.repo.List(ctx, opts)
+	if err != nil {
+		return nil, err
+	}
+
+	res := &domain.ListResult[*domain.Application]{
+		Data: applications,
+		Meta: nil,
+	}
+
+	if opts.IsPaginate {
+		res.Meta = domain.CalculateMeta(total, opts.Page, opts.Limit)
+	}
+
+	return res, nil
 }
 
 func (s *Service) GetByID(ctx context.Context, appID int64) (*domain.Application, error) {

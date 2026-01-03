@@ -4,11 +4,11 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"horizonx-server/internal/domain"
 
-	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
@@ -25,41 +25,93 @@ func NewApplicationRepository(db *pgxpool.Pool) domain.ApplicationRepository {
 // APPLICATIONS
 // ============================================================================
 
-func (r *ApplicationRepository) List(ctx context.Context, serverID uuid.UUID) ([]domain.Application, error) {
-	query := `
-		SELECT id, server_id, name, repo_url, branch, status, last_deployment_at, created_at, updated_at
+func (r *ApplicationRepository) List(ctx context.Context, opts domain.ApplicationListOptions) ([]*domain.Application, int64, error) {
+	baseQuery := `
+		SELECT
+			id,
+			server_id,
+			name,
+			repo_url,
+			branch,
+			status,
+			last_deployment_at,
+			created_at,
+			updated_at
 		FROM applications
-		WHERE server_id = $1 AND deleted_at IS NULL
-		ORDER BY created_at DESC
 	`
 
-	rows, err := r.db.Query(ctx, query, serverID)
+	args := []any{}
+	conditions := []string{}
+	argCounter := 1
+
+	if opts.ServerID != nil {
+		conditions = append(conditions, fmt.Sprintf("server_id = $%d", argCounter))
+		args = append(args, *opts.ServerID)
+		argCounter++
+	}
+
+	if opts.Search != "" {
+		conditions = append(conditions, fmt.Sprintf("(name ILIKE $%d)", argCounter))
+		searchParam := "%" + opts.Search + "%"
+		args = append(args, searchParam)
+		argCounter += 2
+	}
+
+	if len(conditions) > 0 {
+		baseQuery += " WHERE " + strings.Join(conditions, " AND ")
+	}
+
+	baseQuery += " AND deleted_at IS NULL ORDER BY created_at DESC"
+
+	var total int64
+	if opts.IsPaginate {
+		countQuery := "SELECT COUNT(*) FROM applications"
+		if len(conditions) > 0 {
+			countQuery += " WHERE " + strings.Join(conditions, " AND ")
+		}
+		if err := r.db.QueryRow(ctx, countQuery, args...).Scan(&total); err != nil {
+			return nil, 0, fmt.Errorf("failed to count applications: %w", err)
+		}
+
+		offset := (opts.Page - 1) * opts.Limit
+		baseQuery += fmt.Sprintf(" LIMIT $%d OFFSET $%d", argCounter, argCounter+1)
+		args = append(args, opts.Limit, offset)
+	} else {
+		baseQuery += fmt.Sprintf(" LIMIT %d", opts.Limit)
+	}
+
+	rows, err := r.db.Query(ctx, baseQuery, args...)
 	if err != nil {
-		return nil, fmt.Errorf("failed to query applications: %w", err)
+		return nil, 0, fmt.Errorf("failed to query applications: %w", err)
 	}
 	defer rows.Close()
 
-	var apps []domain.Application
+	var applications []*domain.Application
 	for rows.Next() {
-		var app domain.Application
-		err := rows.Scan(
-			&app.ID,
-			&app.ServerID,
-			&app.Name,
-			&app.RepoURL,
-			&app.Branch,
-			&app.Status,
-			&app.LastDeploymentAt,
-			&app.CreatedAt,
-			&app.UpdatedAt,
-		)
-		if err != nil {
-			return nil, fmt.Errorf("failed to scan application: %w", err)
+		var a domain.Application
+
+		if err := rows.Scan(
+			&a.ID,
+			&a.ServerID,
+			&a.Name,
+			&a.RepoURL,
+			&a.Branch,
+			&a.Status,
+			&a.LastDeploymentAt,
+			&a.CreatedAt,
+			&a.UpdatedAt,
+		); err != nil {
+			return nil, 0, fmt.Errorf("failed to scan applications: %w", err)
 		}
-		apps = append(apps, app)
+
+		applications = append(applications, &a)
 	}
 
-	return apps, nil
+	if err := rows.Err(); err != nil {
+		return nil, 0, err
+	}
+
+	return applications, total, nil
 }
 
 func (r *ApplicationRepository) GetByID(ctx context.Context, appID int64) (*domain.Application, error) {

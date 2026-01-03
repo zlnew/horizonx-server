@@ -37,7 +37,19 @@ func (h *ApplicationHandler) Index(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	apps, err := h.svc.List(r.Context(), serverID)
+	q := r.URL.Query()
+
+	opts := domain.ApplicationListOptions{
+		ListOptions: domain.ListOptions{
+			Page:       GetInt(q, "page", 1),
+			Limit:      GetInt(q, "lmit", 10),
+			Search:     GetString(q, "search", ""),
+			IsPaginate: GetBool(q, "paginate"),
+		},
+		ServerID: &serverID,
+	}
+
+	result, err := h.svc.List(r.Context(), opts)
 	if err != nil {
 		JSONError(w, http.StatusInternalServerError, "failed to list applications")
 		return
@@ -45,7 +57,8 @@ func (h *ApplicationHandler) Index(w http.ResponseWriter, r *http.Request) {
 
 	JSONSuccess(w, http.StatusOK, APIResponse{
 		Message: "OK",
-		Data:    apps,
+		Data:    result.Data,
+		Meta:    result.Meta,
 	})
 }
 

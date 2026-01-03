@@ -39,8 +39,8 @@ type ServerRepository interface {
 	Create(ctx context.Context, s *Server) (*Server, error)
 	Update(ctx context.Context, s *Server, serverID uuid.UUID) error
 	UpdateOSInfo(ctx context.Context, serverID uuid.UUID, osInfo OSInfo) error
-	Delete(ctx context.Context, serverID uuid.UUID) error
 	UpdateStatus(ctx context.Context, serverID uuid.UUID, isOnline bool) error
+	Delete(ctx context.Context, serverID uuid.UUID) error
 }
 
 type ServerService interface {
@@ -49,9 +49,9 @@ type ServerService interface {
 	Register(ctx context.Context, req ServerSaveRequest) (*Server, string, error)
 	Update(ctx context.Context, req ServerSaveRequest, serverID uuid.UUID) error
 	UpdateOSInfo(ctx context.Context, serverID uuid.UUID, osInfo OSInfo) error
+	UpdateStatus(ctx context.Context, serverID uuid.UUID, status bool) error
 	Delete(ctx context.Context, serverID uuid.UUID) error
 	AuthorizeAgent(ctx context.Context, serverID uuid.UUID, secret string) (*Server, error)
-	UpdateStatus(ctx context.Context, serverID uuid.UUID, status bool) error
 }
 
 func ValidateAgentCredentials(token string) (uuid.UUID, string, error) {
