@@ -21,8 +21,8 @@ func CORS(cfg *config.Config) Middleware {
 				h.Set("Access-Control-Allow-Origin", origin)
 				h.Set("Vary", "Origin")
 				h.Set("Access-Control-Allow-Credentials", "true")
-				h.Set("Access-Control-Allow-Methods", "GET,POST,OPTIONS")
-				h.Set("Access-Control-Allow-Headers", "Content-Type,Authorization")
+				h.Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
+				h.Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
 			}
 
 			if r.Method == http.MethodOptions {

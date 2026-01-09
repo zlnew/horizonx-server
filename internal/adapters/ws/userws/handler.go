@@ -56,7 +56,7 @@ func (h *Handler) Serve(w http.ResponseWriter, r *http.Request) {
 		tokenString := cookie.Value
 		claims, err := domain.ValidateToken(tokenString, h.secret)
 		if err == nil {
-			clientID = fmt.Sprintf("%v", &claims.UserID)
+			clientID = fmt.Sprintf("%v", claims.UserID)
 		}
 	}
 

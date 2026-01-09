@@ -13,8 +13,15 @@ func New() *Chain {
 	return &Chain{middlewares: []Middleware{}}
 }
 
-func (c *Chain) Use(mw Middleware) {
+func (c *Chain) Use(mw Middleware) *Chain {
 	c.middlewares = append(c.middlewares, mw)
+	return c
+}
+
+func (c *Chain) Extend(mw Middleware) *Chain {
+	newMiddlewares := append([]Middleware{}, c.middlewares...)
+	newMiddlewares = append(newMiddlewares, mw)
+	return &Chain{middlewares: newMiddlewares}
 }
 
 func (c *Chain) Then(h http.Handler) http.Handler {

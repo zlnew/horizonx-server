@@ -7,7 +7,7 @@ import (
 	"horizonx/internal/domain"
 )
 
-func RequirePermission(roleSvc domain.RoleService, perm domain.PermissionConst) Middleware {
+func Permission(roleSvc domain.RoleService, perm domain.PermissionConst) Middleware {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			if err := roleSvc.HasPermission(r.Context(), perm); err != nil {

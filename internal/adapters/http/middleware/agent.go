@@ -10,11 +10,11 @@ import (
 	"github.com/google/uuid"
 )
 
-type key int
+type serverIDKeyType int
 
-const ServerIDKey key = 0
+const ServerIDKey serverIDKeyType = 0
 
-func AgentAuth(svc domain.ServerService) Middleware {
+func Agent(svc domain.ServerService) Middleware {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			auth := r.Header.Get("Authorization")

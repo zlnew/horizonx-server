@@ -39,7 +39,18 @@ func NewRouter(cfg *config.Config, deps *RouterDeps) http.Handler {
 	userStack.Use(middleware.CSRF(cfg))
 
 	agentStack := middleware.New()
-	agentStack.Use(middleware.AgentAuth(deps.ServerService))
+	agentStack.Use(middleware.Agent(deps.ServerService))
+
+	metricsReadStack := userStack.Extend(middleware.Permission(deps.RoleService, domain.PermMetricsRead))
+
+	serverReadStack := userStack.Extend(middleware.Permission(deps.RoleService, domain.PermServerRead))
+	serverWriteStack := userStack.Extend(middleware.Permission(deps.RoleService, domain.PermServerWrite))
+
+	memberReadStack := userStack.Extend(middleware.Permission(deps.RoleService, domain.PermMemberRead))
+	memberWriteStack := userStack.Extend(middleware.Permission(deps.RoleService, domain.PermMemberWrite))
+
+	appReadStack := userStack.Extend(middleware.Permission(deps.RoleService, domain.PermAppRead))
+	appWriteStack := userStack.Extend(middleware.Permission(deps.RoleService, domain.PermAppWrite))
 
 	// HEALTH
 	mux.HandleFunc("GET /health", func(w http.ResponseWriter, r *http.Request) {
@@ -52,62 +63,63 @@ func NewRouter(cfg *config.Config, deps *RouterDeps) http.Handler {
 
 	// AUTH
 	mux.HandleFunc("POST /auth/login", deps.Auth.Login)
-	mux.Handle("POST /auth/logout", userStack.Then(http.HandlerFunc(deps.Auth.Logout)))
+	mux.Handle("POST /auth/logout", userStack.ThenFunc(deps.Auth.Logout))
 
 	// AGENT ENDPOINTS
-	mux.Handle("POST /agent/logs", agentStack.Then(http.HandlerFunc(deps.Log.Store)))
-	mux.Handle("GET /agent/jobs", agentStack.Then(http.HandlerFunc(deps.Job.Pending)))
-	mux.Handle("POST /agent/jobs/{id}/start", agentStack.Then(http.HandlerFunc(deps.Job.Start)))
-	mux.Handle("POST /agent/jobs/{id}/finish", agentStack.Then(http.HandlerFunc(deps.Job.Finish)))
-	mux.Handle("POST /agent/metrics", agentStack.Then(http.HandlerFunc(deps.Metrics.Ingest)))
-	mux.Handle("POST /agent/applications/health", agentStack.Then(http.HandlerFunc(deps.Application.ReportHealth)))
-	mux.Handle("POST /agent/deployments/{id}/commit-info", agentStack.Then(http.HandlerFunc(deps.Deployment.UpdateCommitInfo)))
+	mux.Handle("POST /agent/logs", agentStack.ThenFunc(deps.Log.Store))
+	mux.Handle("GET /agent/jobs", agentStack.ThenFunc(deps.Job.Pending))
+	mux.Handle("POST /agent/jobs/{id}/start", agentStack.ThenFunc(deps.Job.Start))
+	mux.Handle("POST /agent/jobs/{id}/finish", agentStack.ThenFunc(deps.Job.Finish))
+	mux.Handle("POST /agent/metrics", agentStack.ThenFunc(deps.Metrics.Ingest))
+	mux.Handle("POST /agent/applications/health", agentStack.ThenFunc(deps.Application.ReportHealth))
+	mux.Handle("POST /agent/deployments/{id}/commit-info", agentStack.ThenFunc(deps.Deployment.UpdateCommitInfo))
 
 	// LOGS
-	mux.Handle("GET /logs", userStack.Then(http.HandlerFunc(deps.Log.Index)))
+	mux.Handle("GET /logs", userStack.ThenFunc(deps.Log.Index))
+
+	// JOBS
+	mux.Handle("GET /jobs", userStack.ThenFunc(deps.Job.Index))
+	mux.Handle("GET /jobs/{id}", userStack.ThenFunc(deps.Job.Show))
 
 	// SERVERS
-	mux.Handle("GET /servers", userStack.Then(http.HandlerFunc(deps.Server.Index)))
-	mux.Handle("POST /servers", userStack.Then(http.HandlerFunc(deps.Server.Store)))
-	mux.Handle("PUT /servers/{id}", userStack.Then(http.HandlerFunc(deps.Server.Update)))
-	mux.Handle("DELETE /servers/{id}", userStack.Then(http.HandlerFunc(deps.Server.Destroy)))
+	mux.Handle("GET /servers", serverReadStack.ThenFunc(deps.Server.Index))
+	mux.Handle("POST /servers", serverWriteStack.ThenFunc(deps.Server.Store))
+	mux.Handle("PUT /servers/{id}", serverWriteStack.ThenFunc(deps.Server.Update))
+	mux.Handle("DELETE /servers/{id}", serverWriteStack.ThenFunc(deps.Server.Destroy))
 
 	// SERVER METRICS
-	mux.Handle("GET /servers/{id}/metrics/latest", userStack.Then(http.HandlerFunc(deps.Metrics.Latest)))
-	mux.Handle("GET /servers/{id}/metrics/cpu-usage-history", userStack.Then(http.HandlerFunc(deps.Metrics.CPUUsageHistory)))
-	mux.Handle("GET /servers/{id}/metrics/net-speed-history", userStack.Then(http.HandlerFunc(deps.Metrics.NetSpeedHistory)))
 
-	// JOBS (user-facing)
-	mux.Handle("GET /jobs", userStack.Then(http.HandlerFunc(deps.Job.Index)))
-	mux.Handle("GET /jobs/{id}", userStack.Then(http.HandlerFunc(deps.Job.Show)))
+	mux.Handle("GET /servers/{id}/metrics/latest", metricsReadStack.ThenFunc(deps.Metrics.Latest))
+	mux.Handle("GET /servers/{id}/metrics/cpu-usage-history", metricsReadStack.ThenFunc(deps.Metrics.CPUUsageHistory))
+	mux.Handle("GET /servers/{id}/metrics/net-speed-history", metricsReadStack.ThenFunc(deps.Metrics.NetSpeedHistory))
 
 	// USERS
-	mux.Handle("GET /users", userStack.Then(http.HandlerFunc(deps.User.Index)))
-	mux.Handle("POST /users", userStack.Then(http.HandlerFunc(deps.User.Store)))
-	mux.Handle("PUT /users/{id}", userStack.Then(http.HandlerFunc(deps.User.Update)))
-	mux.Handle("DELETE /users/{id}", userStack.Then(http.HandlerFunc(deps.User.Destroy)))
+	mux.Handle("GET /users", memberReadStack.ThenFunc(deps.User.Index))
+	mux.Handle("POST /users", memberWriteStack.ThenFunc(deps.User.Store))
+	mux.Handle("PUT /users/{id}", memberWriteStack.ThenFunc(deps.User.Update))
+	mux.Handle("DELETE /users/{id}", memberWriteStack.ThenFunc(deps.User.Destroy))
 
 	// APPLICATIONS
-	mux.Handle("GET /applications", userStack.Then(http.HandlerFunc(deps.Application.Index)))
-	mux.Handle("GET /applications/{id}", userStack.Then(http.HandlerFunc(deps.Application.Show)))
-	mux.Handle("POST /applications", userStack.Then(http.HandlerFunc(deps.Application.Store)))
-	mux.Handle("PUT /applications/{id}", userStack.Then(http.HandlerFunc(deps.Application.Update)))
-	mux.Handle("DELETE /applications/{id}", userStack.Then(http.HandlerFunc(deps.Application.Destroy)))
+	mux.Handle("GET /applications", appReadStack.ThenFunc(deps.Application.Index))
+	mux.Handle("GET /applications/{id}", appReadStack.ThenFunc(deps.Application.Show))
+	mux.Handle("POST /applications", appWriteStack.ThenFunc(deps.Application.Store))
+	mux.Handle("PUT /applications/{id}", appWriteStack.ThenFunc(deps.Application.Update))
+	mux.Handle("DELETE /applications/{id}", appWriteStack.ThenFunc(deps.Application.Destroy))
 
 	// APPLICATION ACTIONS
-	mux.Handle("POST /applications/{id}/deploy", userStack.Then(http.HandlerFunc(deps.Application.Deploy)))
-	mux.Handle("POST /applications/{id}/start", userStack.Then(http.HandlerFunc(deps.Application.Start)))
-	mux.Handle("POST /applications/{id}/stop", userStack.Then(http.HandlerFunc(deps.Application.Stop)))
-	mux.Handle("POST /applications/{id}/restart", userStack.Then(http.HandlerFunc(deps.Application.Restart)))
+	mux.Handle("POST /applications/{id}/deploy", appWriteStack.ThenFunc(deps.Application.Deploy))
+	mux.Handle("POST /applications/{id}/start", appWriteStack.ThenFunc(deps.Application.Start))
+	mux.Handle("POST /applications/{id}/stop", appWriteStack.ThenFunc(deps.Application.Stop))
+	mux.Handle("POST /applications/{id}/restart", appWriteStack.ThenFunc(deps.Application.Restart))
 
 	// DEPLOYMENTS
-	mux.Handle("GET /applications/{id}/deployments", userStack.Then(http.HandlerFunc(deps.Deployment.Index)))
-	mux.Handle("GET /applications/{id}/deployments/{deployment_id}", userStack.Then(http.HandlerFunc(deps.Deployment.Show)))
+	mux.Handle("GET /applications/{id}/deployments", appReadStack.ThenFunc(deps.Deployment.Index))
+	mux.Handle("GET /applications/{id}/deployments/{deployment_id}", appReadStack.ThenFunc(deps.Deployment.Show))
 
 	// ENVIRONMENT VARIABLES
-	mux.Handle("POST /applications/{id}/env", userStack.Then(http.HandlerFunc(deps.Application.AddEnvVar)))
-	mux.Handle("PUT /applications/{id}/env/{key}", userStack.Then(http.HandlerFunc(deps.Application.UpdateEnvVar)))
-	mux.Handle("DELETE /applications/{id}/env/{key}", userStack.Then(http.HandlerFunc(deps.Application.DeleteEnvVar)))
+	mux.Handle("POST /applications/{id}/env", appWriteStack.ThenFunc(deps.Application.AddEnvVar))
+	mux.Handle("PUT /applications/{id}/env/{key}", appWriteStack.ThenFunc(deps.Application.UpdateEnvVar))
+	mux.Handle("DELETE /applications/{id}/env/{key}", appWriteStack.ThenFunc(deps.Application.DeleteEnvVar))
 
 	return globalMw.Apply(mux)
 }
